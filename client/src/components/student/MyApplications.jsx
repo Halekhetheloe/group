@@ -1,0 +1,473 @@
+import React, { useState, useEffect } from 'react'
+import { collection, query, where, getDocs, doc, getDoc, orderBy } from 'firebase/firestore'
+import { db } from '../../firebase-config'
+import { useAuth } from '../../hooks/useAuth'
+
+const MyApplications = () => {
+  const { userData } = useAuth()
+  const [applications, setApplications] = useState([])
+  const [filteredApplications, setFilteredApplications] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [typeFilter, setTypeFilter] = useState('all')
+
+  useEffect(() => {
+    if (userData) {
+      fetchApplications()
+    }
+  }, [userData])
+
+  useEffect(() => {
+    filterApplications()
+  }, [applications, searchTerm, statusFilter, typeFilter])
+
+  const fetchApplications = async () => {
+    try {
+      setLoading(true)
+      
+      // Fetch student's applications
+      const applicationsQuery = query(
+        collection(db, 'applications'),
+        where('studentId', '==', userData.uid),
+        orderBy('appliedAt', 'desc')
+      )
+      const applicationsSnapshot = await getDocs(applicationsQuery)
+      const applicationsData = applicationsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }))
+
+      console.log('Raw applications:', applicationsData) // Debug log
+
+      // Fetch details for each application based on type
+      const applicationsWithDetails = await Promise.all(
+        applicationsData.map(async (application) => {
+          try {
+            let details = {}
+            let applicationType = 'unknown'
+
+            // Check if it's a job application
+            if (application.jobId && typeof application.jobId === 'string') {
+              applicationType = 'job'
+              try {
+                const jobDoc = await getDoc(doc(db, 'jobs', application.jobId))
+                if (jobDoc.exists()) {
+                  details = {
+                    ...jobDoc.data(),
+                    id: jobDoc.id
+                  }
+                } else {
+                  details = {
+                    title: 'Job no longer available',
+                    companyName: 'Unknown Company',
+                    location: 'Unknown',
+                    jobType: 'Unknown'
+                  }
+                }
+              } catch (jobError) {
+                console.error('Error fetching job:', jobError)
+                details = {
+                  title: 'Error loading job details',
+                  companyName: 'Unknown',
+                  location: 'Unknown',
+                  jobType: 'Unknown'
+                }
+              }
+            }
+            // Check if it's a course application
+            else if (application.courseId && typeof application.courseId === 'string') {
+              applicationType = 'course'
+              try {
+                const courseDoc = await getDoc(doc(db, 'courses', application.courseId))
+                const courseData = courseDoc.exists() ? courseDoc.data() : { name: 'Course not found' }
+                
+                let institutionData = {}
+                if (courseData.institutionId) {
+                  const institutionDoc = await getDoc(doc(db, 'institutions', courseData.institutionId))
+                  institutionData = institutionDoc.exists() ? institutionDoc.data() : { name: 'Institution not found' }
+                }
+
+                details = {
+                  course: courseData,
+                  institution: institutionData
+                }
+              } catch (courseError) {
+                console.error('Error fetching course:', courseError)
+                details = {
+                  course: { name: 'Error loading course details' },
+                  institution: { name: 'Error loading institution details' }
+                }
+              }
+            }
+
+            return {
+              ...application,
+              ...details,
+              applicationType
+            }
+          } catch (error) {
+            console.error('Error processing application:', error)
+            return {
+              ...application,
+              applicationType: 'unknown',
+              title: 'Error loading application details'
+            }
+          }
+        })
+      )
+
+      setApplications(applicationsWithDetails)
+    } catch (error) {
+      console.error('Error fetching applications:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const filterApplications = () => {
+    let filtered = applications
+
+    // Search filter
+    if (searchTerm) {
+      filtered = filtered.filter(app =>
+        app.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        app.jobTitle?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        app.course?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        app.companyName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        app.institution?.name?.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    }
+
+    // Status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(app => app.status === statusFilter)
+    }
+
+    // Type filter
+    if (typeFilter !== 'all') {
+      filtered = filtered.filter(app => app.applicationType === typeFilter)
+    }
+
+    setFilteredApplications(filtered)
+  }
+
+  const getStatusBadge = (status) => {
+    const statusConfig = {
+      pending: { color: 'bg-yellow-100 text-yellow-800', label: 'Under Review' },
+      under_review: { color: 'bg-blue-100 text-blue-800', label: 'Under Review' },
+      admitted: { color: 'bg-green-100 text-green-800', label: 'Admitted' },
+      accepted: { color: 'bg-green-100 text-green-800', label: 'Accepted' },
+      rejected: { color: 'bg-red-100 text-red-800', label: 'Not Selected' },
+      hired: { color: 'bg-green-100 text-green-800', label: 'Hired' }
+    }
+    
+    const config = statusConfig[status] || { color: 'bg-gray-100 text-gray-800', label: status }
+    
+    return (
+      <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${config.color}`}>
+        {config.label}
+      </span>
+    )
+  }
+
+  const getApplicationTitle = (application) => {
+    if (application.applicationType === 'job') {
+      return application.title || application.jobTitle || 'Job Application'
+    } else if (application.applicationType === 'course') {
+      return application.course?.name || 'Course Application'
+    }
+    return 'Application'
+  }
+
+  const getOrganizationName = (application) => {
+    if (application.applicationType === 'job') {
+      return application.companyName || 'Company'
+    } else if (application.applicationType === 'course') {
+      return application.institution?.name || 'Institution'
+    }
+    return 'Organization'
+  }
+
+  const getStatusDescription = (status, applicationType) => {
+    const jobDescriptions = {
+      pending: 'Your job application is being reviewed by the company.',
+      under_review: 'Your application is under review by the hiring team.',
+      rejected: 'Unfortunately, you were not selected for this position.',
+      hired: 'Congratulations! You have been hired for this position.'
+    }
+
+    const courseDescriptions = {
+      pending: 'Your course application is being reviewed by the institution.',
+      admitted: 'Congratulations! You have been admitted to this program.',
+      rejected: 'Unfortunately, you were not admitted to this program.'
+    }
+
+    if (applicationType === 'job') {
+      return jobDescriptions[status] || 'Status information not available.'
+    } else {
+      return courseDescriptions[status] || 'Status information not available.'
+    }
+  }
+
+  const formatDate = (timestamp) => {
+    if (!timestamp) return 'N/A'
+    try {
+      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp)
+      return date.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      })
+    } catch (error) {
+      return 'Invalid Date'
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="animate-pulse">
+            <div className="h-8 bg-slate-200 rounded w-1/4 mb-6"></div>
+            <div className="h-12 bg-slate-200 rounded mb-6"></div>
+            <div className="space-y-4">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="h-32 bg-slate-200 rounded"></div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-slate-800">My Applications</h1>
+          <p className="text-slate-600 mt-2">
+            Track the status of your course and job applications
+          </p>
+        </div>
+
+        {/* Filters and Search */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
+            <div className="flex-1 max-w-md">
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <div className="h-4 w-4 bg-slate-400 rounded"></div>
+                </div>
+                <input
+                  type="text"
+                  placeholder="Search by job title, company, or course..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+            <div className="flex space-x-4">
+              <select
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+                className="px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="all">All Types</option>
+                <option value="job">Job Applications</option>
+                <option value="course">Course Applications</option>
+              </select>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="all">All Status</option>
+                <option value="pending">Under Review</option>
+                <option value="under_review">Under Review</option>
+                <option value="admitted">Admitted</option>
+                <option value="accepted">Accepted</option>
+                <option value="rejected">Not Selected</option>
+                <option value="hired">Hired</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Applications List */}
+        <div className="space-y-6">
+          {filteredApplications.map((application) => (
+            <div key={application.id} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow">
+              <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between">
+                <div className="flex-1">
+                  {/* Application Header */}
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <div className="flex items-center space-x-2 mb-2">
+                        <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
+                          application.applicationType === 'job' 
+                            ? 'bg-blue-100 text-blue-800'
+                            : 'bg-green-100 text-green-800'
+                        }`}>
+                          {application.applicationType === 'job' ? 'Job' : 'Course'}
+                        </span>
+                        <h3 className="text-xl font-semibold text-slate-800">
+                          {getApplicationTitle(application)}
+                        </h3>
+                      </div>
+                      <div className="flex items-center space-x-4 mt-2">
+                        <div className="flex items-center text-sm text-slate-600">
+                          <div className="h-4 w-4 bg-slate-400 rounded mr-1"></div>
+                          {getOrganizationName(application)}
+                        </div>
+                        {application.location && (
+                          <div className="flex items-center text-sm text-slate-600">
+                            <div className="h-4 w-4 bg-slate-400 rounded mr-1"></div>
+                            {application.location}
+                          </div>
+                        )}
+                        {application.jobType && (
+                          <div className="flex items-center text-sm text-slate-600">
+                            <div className="h-4 w-4 bg-slate-400 rounded mr-1"></div>
+                            {application.jobType}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {getStatusBadge(application.status)}
+                  </div>
+
+                  {/* Status Description */}
+                  <div className={`p-4 rounded-lg mb-4 ${
+                    application.status === 'admitted' || application.status === 'accepted' || application.status === 'hired'
+                      ? 'bg-green-50 border border-green-200'
+                      : application.status === 'rejected'
+                      ? 'bg-red-50 border border-red-200'
+                      : 'bg-blue-50 border border-blue-200'
+                  }`}>
+                    <p className={`text-sm ${
+                      application.status === 'admitted' || application.status === 'accepted' || application.status === 'hired'
+                        ? 'text-green-800'
+                        : application.status === 'rejected'
+                        ? 'text-red-800'
+                        : 'text-blue-800'
+                    }`}>
+                      {getStatusDescription(application.status, application.applicationType)}
+                    </p>
+                    
+                    {application.appliedAt && (
+                      <div className="mt-2 flex items-center text-sm text-slate-600">
+                        <div className="h-4 w-4 bg-slate-400 rounded mr-1"></div>
+                        Applied on {formatDate(application.appliedAt)}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Cover Letter Preview */}
+                  {application.coverLetter && (
+                    <div className="mt-4">
+                      <h4 className="text-sm font-medium text-slate-700 mb-2">Cover Letter</h4>
+                      <p className="text-sm text-slate-600 line-clamp-2">
+                        {application.coverLetter}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex lg:flex-col space-x-2 lg:space-x-0 lg:space-y-2 mt-4 lg:mt-0 lg:ml-6">
+                  <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
+                    View Details
+                  </button>
+                  
+                  {/* Special actions based on status and type */}
+                  {(application.status === 'admitted' || application.status === 'accepted') && (
+                    <button className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm font-medium">
+                      Accept Offer
+                    </button>
+                  )}
+                  
+                  {(application.status === 'pending' || application.status === 'under_review') && (
+                    <button className="bg-slate-600 text-white px-4 py-2 rounded-lg hover:bg-slate-700 transition-colors text-sm font-medium">
+                      Contact
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Empty State */}
+        {filteredApplications.length === 0 && (
+          <div className="text-center py-12">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 max-w-md mx-auto">
+              <div className="h-16 w-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <div className="h-8 w-8 bg-slate-300 rounded"></div>
+              </div>
+              <h3 className="text-lg font-semibold text-slate-800 mb-2">No Applications Found</h3>
+              <p className="text-slate-600 mb-6">
+                {applications.length === 0 
+                  ? "You haven't submitted any applications yet." 
+                  : 'Try changing your filters.'
+                }
+              </p>
+              {applications.length === 0 && (
+                <div className="flex gap-3 justify-center">
+                  <a
+                    href="/#/courses"
+                    className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Browse Courses
+                  </a>
+                  <a
+                    href="/#/jobs"
+                    className="bg-slate-600 text-white px-6 py-2 rounded-lg hover:bg-slate-700 transition-colors"
+                  >
+                    Browse Jobs
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Application Statistics */}
+        {applications.length > 0 && (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mt-6">
+            <h3 className="text-lg font-semibold text-slate-800 mb-4">Application Statistics</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="text-center p-4 bg-blue-50 rounded-lg">
+                <div className="text-2xl font-bold text-blue-700">{applications.length}</div>
+                <div className="text-blue-600">Total</div>
+              </div>
+              <div className="text-center p-4 bg-yellow-50 rounded-lg">
+                <div className="text-2xl font-bold text-yellow-700">
+                  {applications.filter(app => app.status === 'pending' || app.status === 'under_review').length}
+                </div>
+                <div className="text-yellow-600">Under Review</div>
+              </div>
+              <div className="text-center p-4 bg-green-50 rounded-lg">
+                <div className="text-2xl font-bold text-green-700">
+                  {applications.filter(app => app.status === 'admitted' || app.status === 'accepted' || app.status === 'hired').length}
+                </div>
+                <div className="text-green-600">Successful</div>
+              </div>
+              <div className="text-center p-4 bg-red-50 rounded-lg">
+                <div className="text-2xl font-bold text-red-700">
+                  {applications.filter(app => app.status === 'rejected').length}
+                </div>
+                <div className="text-red-600">Not Selected</div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+export default MyApplications

@@ -1,0 +1,530 @@
+import React, { useState, useEffect } from 'react'
+import { collection, query, getDocs, where, orderBy, doc, getDoc, addDoc } from 'firebase/firestore'
+import { db } from '../../firebase-config'
+import { useAuth } from '../../hooks/useAuth'
+
+const CourseBrowser = () => {
+  const { userData } = useAuth()
+  const [courses, setCourses] = useState([])
+  const [filteredCourses, setFilteredCourses] = useState([])
+  const [institutions, setInstitutions] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [institutionFilter, setInstitutionFilter] = useState('all')
+  const [facultyFilter, setFacultyFilter] = useState('all')
+  const [durationFilter, setDurationFilter] = useState('all')
+  const [sortBy, setSortBy] = useState('newest')
+  const [appliedCourses, setAppliedCourses] = useState(new Set())
+
+  // CSS Styles
+  const styles = {
+    // Main container styles
+    container: "min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6",
+    headerContainer: "max-w-7xl mx-auto",
+    
+    // Header styles
+    header: "text-4xl font-bold text-slate-800 mb-3",
+    subtitle: "text-lg text-slate-600 mb-8",
+    
+    // Card styles
+    card: "bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-lg transition-all duration-300 backdrop-blur-sm bg-white/95",
+    filterCard: "bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6",
+    
+    // Input and select styles
+    inputField: "w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white text-slate-900 placeholder-slate-500",
+    selectField: "px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white text-slate-900 min-w-[150px]",
+    
+    // Button styles
+    btnPrimary: "bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 rounded-xl font-semibold shadow-sm hover:shadow-md transition-all duration-200 transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none",
+    btnSecondary: "bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white px-6 py-3 rounded-xl font-semibold shadow-sm hover:shadow-md transition-all duration-200 transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none",
+    btnOutline: "border-2 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white px-6 py-3 rounded-xl font-semibold transition-all duration-200 transform hover:-translate-y-0.5",
+    
+    // Text styles
+    courseTitle: "text-xl font-bold text-slate-800 group-hover:text-blue-600 transition-colors duration-200",
+    institutionName: "text-sm text-slate-600 mt-1",
+    courseDescription: "text-sm text-slate-600 mb-4 line-clamp-3",
+    detailText: "text-sm text-slate-600 flex items-center",
+    
+    // Badge and tag styles
+    requirementBadge: "inline-block bg-slate-100 text-slate-700 text-xs px-2 py-1 rounded-lg border border-slate-200",
+    moreBadge: "inline-block bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-lg border border-blue-200",
+    
+    // Status styles
+    deadlinePassed: "bg-red-50 border border-red-200 text-red-700",
+    deadlineActive: "bg-blue-50 border border-blue-200 text-blue-700",
+    warningText: "text-xs text-red-600 mt-1",
+    
+    // Layout styles
+    grid: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6",
+    flexBetween: "flex items-center justify-between",
+    flexCenter: "flex items-center justify-center",
+    
+    // Icon styles
+    iconButton: "p-1 text-slate-400 hover:text-blue-500 rounded transition-colors duration-200",
+    icon: "h-4 w-4 mr-2",
+    
+    // Empty state styles
+    emptyState: "text-center py-12",
+    emptyIcon: "mx-auto h-12 w-12 text-slate-400 mb-4",
+    emptyTitle: "text-lg font-semibold text-slate-800 mb-2",
+    emptyText: "text-slate-600 mb-6",
+    
+    // Loading styles
+    loadingPulse: "animate-pulse",
+    loadingHeader: "h-8 bg-slate-200 rounded w-1/4 mb-6",
+    loadingFilter: "h-12 bg-slate-200 rounded mb-6",
+    loadingCard: "h-96 bg-slate-200 rounded-lg"
+  }
+
+  useEffect(() => {
+    fetchData()
+  }, [])
+
+  useEffect(() => {
+    filterAndSortCourses()
+  }, [courses, searchTerm, institutionFilter, facultyFilter, durationFilter, sortBy])
+
+  useEffect(() => {
+    if (userData) {
+      fetchAppliedCourses()
+    }
+  }, [userData])
+
+  const fetchData = async () => {
+    try {
+      setLoading(true)
+      
+      // Fetch all active courses
+      const coursesQuery = query(
+        collection(db, 'courses'),
+        where('status', '==', 'active'),
+        orderBy('createdAt', 'desc')
+      )
+      const coursesSnapshot = await getDocs(coursesQuery)
+      const coursesData = coursesSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }))
+
+      // Fetch institution details for each course
+      const coursesWithInstitutions = await Promise.all(
+        coursesData.map(async (course) => {
+          const institutionDoc = await getDoc(doc(db, 'institutions', course.institutionId))
+          const institutionData = institutionDoc.exists() ? institutionDoc.data() : { name: 'Unknown Institution', location: 'Unknown' }
+          return {
+            ...course,
+            institution: institutionData
+          }
+        })
+      )
+
+      setCourses(coursesWithInstitutions)
+
+      // Get unique institutions for filter
+      const uniqueInstitutions = [...new Set(coursesData.map(course => course.institutionId))]
+      const institutionDetails = await Promise.all(
+        uniqueInstitutions.map(async (id) => {
+          const institutionDoc = await getDoc(doc(db, 'institutions', id))
+          return {
+            id,
+            ...institutionDoc.data()
+          }
+        })
+      )
+      setInstitutions(institutionDetails)
+
+    } catch (error) {
+      console.error('Error fetching data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchAppliedCourses = async () => {
+    try {
+      const applicationsQuery = query(
+        collection(db, 'applications'),
+        where('studentId', '==', userData.uid)
+      )
+      const applicationsSnapshot = await getDocs(applicationsQuery)
+      const appliedCourseIds = applicationsSnapshot.docs.map(doc => doc.data().courseId)
+      setAppliedCourses(new Set(appliedCourseIds))
+    } catch (error) {
+      console.error('Error fetching applications:', error)
+    }
+  }
+
+  const filterAndSortCourses = () => {
+    let filtered = courses
+
+    // Search filter
+    if (searchTerm) {
+      filtered = filtered.filter(course =>
+        course.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        course.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        course.institution?.name?.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    }
+
+    // Institution filter
+    if (institutionFilter !== 'all') {
+      filtered = filtered.filter(course => course.institutionId === institutionFilter)
+    }
+
+    // Faculty filter
+    if (facultyFilter !== 'all') {
+      filtered = filtered.filter(course => course.facultyId === facultyFilter)
+    }
+
+    // Duration filter
+    if (durationFilter !== 'all') {
+      filtered = filtered.filter(course => {
+        const duration = course.duration?.toLowerCase() || ''
+        if (durationFilter === 'short' && (duration.includes('month') || duration.includes('1 year'))) {
+          return true
+        }
+        if (durationFilter === 'medium' && (duration.includes('2 year') || duration.includes('3 year'))) {
+          return true
+        }
+        if (durationFilter === 'long' && (duration.includes('4 year') || duration.includes('5 year'))) {
+          return true
+        }
+        return false
+      })
+    }
+
+    // Sort courses
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case 'newest':
+          return new Date(b.createdAt?.toDate?.() || b.createdAt) - new Date(a.createdAt?.toDate?.() || a.createdAt)
+        case 'oldest':
+          return new Date(a.createdAt?.toDate?.() || a.createdAt) - new Date(b.createdAt?.toDate?.() || b.createdAt)
+        case 'name':
+          return a.name.localeCompare(b.name)
+        case 'deadline':
+          return new Date(a.applicationDeadline?.toDate?.() || a.applicationDeadline) - new Date(b.applicationDeadline?.toDate?.() || b.applicationDeadline)
+        default:
+          return 0
+      }
+    })
+
+    setFilteredCourses(filtered)
+  }
+
+  const applyForCourse = async (courseId) => {
+    if (!userData) {
+      alert('Please log in to apply for courses')
+      return
+    }
+
+    // Check if already applied
+    if (appliedCourses.has(courseId)) {
+      alert('You have already applied for this course')
+      return
+    }
+
+    // Check application limit (max 2 applications per institution)
+    const course = courses.find(c => c.id === courseId)
+    const institutionApplications = Array.from(appliedCourses).filter(id => {
+      const appliedCourse = courses.find(c => c.id === id)
+      return appliedCourse?.institutionId === course?.institutionId
+    })
+
+    if (institutionApplications.length >= 2) {
+      alert('You can only apply for 2 courses per institution')
+      return
+    }
+
+    try {
+      const applicationData = {
+        studentId: userData.uid,
+        courseId: courseId,
+        institutionId: course?.institutionId,
+        status: 'pending',
+        appliedAt: new Date(),
+        documents: [],
+        type: 'course'
+      }
+
+      await addDoc(collection(db, 'applications'), applicationData)
+      
+      // Update local state
+      setAppliedCourses(prev => new Set([...prev, courseId]))
+      alert('Application submitted successfully!')
+    } catch (error) {
+      console.error('Error applying for course:', error)
+      alert('Failed to submit application. Please try again.')
+    }
+  }
+
+  const isDeadlinePassed = (deadline) => {
+    if (!deadline) return true
+    const deadlineDate = deadline.toDate ? deadline.toDate() : new Date(deadline)
+    return deadlineDate < new Date()
+  }
+
+  const formatDate = (timestamp) => {
+    if (!timestamp) return 'N/A'
+    try {
+      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp)
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      })
+    } catch (error) {
+      return 'Invalid Date'
+    }
+  }
+
+  const getUniqueFaculties = () => {
+    const faculties = courses.map(course => ({
+      id: course.facultyId,
+      name: course.facultyName
+    }))
+    return faculties.filter((faculty, index, self) => 
+      faculty.id && self.findIndex(f => f.id === faculty.id) === index
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.headerContainer}>
+          <div className={styles.loadingPulse}>
+            <div className={styles.loadingHeader}></div>
+            <div className={styles.loadingFilter}></div>
+            <div className={styles.grid}>
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className={styles.loadingCard}></div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className={styles.container}>
+      <div className={styles.headerContainer}>
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className={styles.header}>Browse Courses</h1>
+          <p className={styles.subtitle}>
+            Discover programs from institutions across Lesotho
+          </p>
+        </div>
+
+        {/* Filters and Search */}
+        <div className={styles.filterCard}>
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
+            <div className="flex-1 max-w-md">
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <div className="h-4 w-4 bg-slate-400 rounded"></div>
+                </div>
+                <input
+                  type="text"
+                  placeholder="Search courses, institutions, or programs..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className={`${styles.inputField} pl-10`}
+                />
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-4">
+              <select
+                value={institutionFilter}
+                onChange={(e) => setInstitutionFilter(e.target.value)}
+                className={styles.selectField}
+              >
+                <option value="all">All Institutions</option>
+                {institutions.map(institution => (
+                  <option key={institution.id} value={institution.id}>
+                    {institution.name}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={facultyFilter}
+                onChange={(e) => setFacultyFilter(e.target.value)}
+                className={styles.selectField}
+              >
+                <option value="all">All Faculties</option>
+                {getUniqueFaculties().map(faculty => (
+                  <option key={faculty.id} value={faculty.id}>
+                    {faculty.name}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={durationFilter}
+                onChange={(e) => setDurationFilter(e.target.value)}
+                className={styles.selectField}
+              >
+                <option value="all">Any Duration</option>
+                <option value="short">Short (≤1 year)</option>
+                <option value="medium">Medium (2-3 years)</option>
+                <option value="long">Long (≥4 years)</option>
+              </select>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className={styles.selectField}
+              >
+                <option value="newest">Newest First</option>
+                <option value="oldest">Oldest First</option>
+                <option value="name">Name A-Z</option>
+                <option value="deadline">Application Deadline</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Courses Grid */}
+        <div className={styles.grid}>
+          {filteredCourses.map((course) => {
+            const hasApplied = appliedCourses.has(course.id)
+            const deadlinePassed = isDeadlinePassed(course.applicationDeadline)
+            
+            return (
+              <div key={course.id} className={`${styles.card} group`}>
+                {/* Course Header */}
+                <div className={styles.flexBetween}>
+                  <div className="flex-1">
+                    <h3 className={styles.courseTitle}>
+                      {course.name}
+                    </h3>
+                    <p className={styles.institutionName}>{course.institution?.name}</p>
+                  </div>
+                  <div className="flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                    <button className={styles.iconButton}>
+                      <div className="h-4 w-4 bg-red-400 rounded"></div>
+                    </button>
+                    <button className={styles.iconButton}>
+                      <div className="h-4 w-4 bg-blue-400 rounded"></div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Course Description */}
+                <p className={styles.courseDescription}>
+                  {course.description}
+                </p>
+
+                {/* Course Details */}
+                <div className="space-y-3 mb-4">
+                  <div className={styles.detailText}>
+                    <div className="h-4 w-4 bg-blue-500 rounded mr-2"></div>
+                    {course.facultyName || 'General Studies'}
+                  </div>
+                  <div className={styles.detailText}>
+                    <div className="h-4 w-4 bg-green-500 rounded mr-2"></div>
+                    {course.duration || 'Duration not specified'}
+                  </div>
+                  <div className={styles.detailText}>
+                    <div className="h-4 w-4 bg-yellow-500 rounded mr-2"></div>
+                    {course.tuition || 'Tuition not specified'}
+                  </div>
+                  <div className={styles.detailText}>
+                    <div className="h-4 w-4 bg-purple-500 rounded mr-2"></div>
+                    {course.institution?.location || 'Location not specified'}
+                  </div>
+                  <div className={styles.detailText}>
+                    <div className="h-4 w-4 bg-indigo-500 rounded mr-2"></div>
+                    {course.seats || 'Unknown'} seats available
+                  </div>
+                </div>
+
+                {/* Application Deadline */}
+                <div className={`p-3 rounded-lg mb-4 ${
+                  deadlinePassed ? styles.deadlinePassed : styles.deadlineActive
+                }`}>
+                  <div className="flex justify-between items-center text-sm">
+                    <span>Application Deadline</span>
+                    <span className="font-medium">
+                      {formatDate(course.applicationDeadline)}
+                    </span>
+                  </div>
+                  {deadlinePassed && (
+                    <p className={styles.warningText}>Applications closed</p>
+                  )}
+                </div>
+
+                {/* Requirements Preview */}
+                {course.requirements && course.requirements.length > 0 && (
+                  <div className="mb-4">
+                    <h4 className="text-sm font-medium text-slate-800 mb-2">Requirements:</h4>
+                    <div className="flex flex-wrap gap-1">
+                      {course.requirements.slice(0, 2).map((requirement, index) => (
+                        <span key={index} className={styles.requirementBadge}>
+                          {requirement}
+                        </span>
+                      ))}
+                      {course.requirements.length > 2 && (
+                        <span className={styles.moreBadge}>
+                          +{course.requirements.length - 2} more
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex space-x-2">
+                  <button className={styles.btnSecondary}>
+                    <div className="h-4 w-4 bg-white rounded mr-1"></div>
+                    View Details
+                  </button>
+                  <button
+                    onClick={() => applyForCourse(course.id)}
+                    disabled={hasApplied || deadlinePassed || !userData}
+                    className={styles.btnPrimary}
+                  >
+                    {hasApplied ? 'Applied' : deadlinePassed ? 'Closed' : 'Apply Now'}
+                  </button>
+                </div>
+
+                {/* Application Limit Warning */}
+                {!hasApplied && !deadlinePassed && userData && (
+                  <div className="mt-2 text-xs text-slate-500">
+                    Max 2 applications per institution
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Empty State */}
+        {filteredCourses.length === 0 && (
+          <div className={styles.emptyState}>
+            <div className={styles.emptyIcon}></div>
+            <h3 className={styles.emptyTitle}>
+              {courses.length === 0 ? 'No courses available' : 'No courses found'}
+            </h3>
+            <p className={styles.emptyText}>
+              {courses.length === 0 
+                ? 'Check back later for new course offerings.' 
+                : 'Try adjusting your search terms or filters.'
+              }
+            </p>
+          </div>
+        )}
+
+        {/* Results Count */}
+        {filteredCourses.length > 0 && (
+          <div className="mt-6 text-center">
+            <p className="text-sm text-slate-600">
+              Showing {filteredCourses.length} of {courses.length} courses
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+export default CourseBrowser

@@ -1,0 +1,22 @@
+{
+  "name": "CareerPath Lesotho - Career Guidance Platform",
+  "short_name": "CareerPath LS",
+  "description": "Career Guidance and Employment Integration Platform for Lesotho Students",
+  "version": "1.0.0",
+  "manifest_version": 3,
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#667eea",
+  "background_color": "#ffffff",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "64x64",
+      "type": "image/x-icon"
+    }
+  ],
+  "categories": ["education", "business", "productivity"],
+  "lang": "en",
+  "dir": "ltr"
+}

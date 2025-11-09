@@ -1,0 +1,159 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users collection
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if request.auth != null && hasRole(['admin']);
+      allow create: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Institutions collection
+    match /institutions/{institutionId} {
+      allow read: if true; // Public read access
+      allow write: if request.auth != null && (
+        hasRole(['admin']) || 
+        (hasRole(['institution']) && request.auth.uid == resource.data.adminId)
+      );
+      allow create: if request.auth != null && hasRole(['admin']);
+    }
+    
+    // Courses collection
+    match /courses/{courseId} {
+      allow read: if true; // Public read access
+      allow write: if request.auth != null && (
+        hasRole(['admin']) || 
+        (hasRole(['institution']) && institutionHasCourse(institutionId, courseId))
+      );
+    }
+    
+    // Applications collection
+    match /applications/{applicationId} {
+      allow read: if request.auth != null && (
+        hasRole(['admin']) ||
+        (hasRole(['student']) && request.auth.uid == resource.data.studentId) ||
+        (hasRole(['institution']) && institutionHasApplication(institutionId, applicationId))
+      );
+      allow write: if request.auth != null && (
+        hasRole(['admin']) ||
+        (hasRole(['student']) && request.auth.uid == resource.data.studentId) ||
+        (hasRole(['institution']) && institutionHasApplication(institutionId, applicationId))
+      );
+      allow create: if request.auth != null && hasRole(['student']);
+    }
+    
+    // Jobs collection
+    match /jobs/{jobId} {
+      allow read: if true; // Public read access
+      allow write: if request.auth != null && (
+        hasRole(['admin']) || 
+        (hasRole(['company']) && companyHasJob(companyId, jobId))
+      );
+      allow create: if request.auth != null && hasRole(['company']);
+    }
+    
+    // Job Applications collection
+    match /jobApplications/{jobApplicationId} {
+      allow read: if request.auth != null && (
+        hasRole(['admin']) ||
+        (hasRole(['student']) && request.auth.uid == resource.data.studentId) ||
+        (hasRole(['company']) && companyHasJobApplication(companyId, jobApplicationId))
+      );
+      allow write: if request.auth != null && (
+        hasRole(['admin']) ||
+        (hasRole(['student']) && request.auth.uid == resource.data.studentId) ||
+        (hasRole(['company']) && companyHasJobApplication(companyId, jobApplicationId))
+      );
+      allow create: if request.auth != null && hasRole(['student']);
+    }
+    
+    // Transcripts collection
+    match /transcripts/{transcriptId} {
+      allow read: if request.auth != null && (
+        hasRole(['admin']) ||
+        (hasRole(['student']) && request.auth.uid == resource.data.studentId) ||
+        (hasRole(['company']) && companyCanViewTranscript(companyId, transcriptId))
+      );
+      allow write: if request.auth != null && (
+        hasRole(['admin']) ||
+        (hasRole(['student']) && request.auth.uid == resource.data.studentId)
+      );
+    }
+    
+    // Notifications collection
+    match /notifications/{notificationId} {
+      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow read, write: if request.auth != null && hasRole(['admin']);
+    }
+    
+    // System collection (admin only)
+    match /system/{document} {
+      allow read, write: if request.auth != null && hasRole(['admin']);
+    }
+    
+    // Helper functions
+    function hasRole(roles) {
+      return request.auth.token.role in roles;
+    }
+    
+    function institutionHasCourse(institutionId, courseId) {
+      return get(/databases/$(database)/documents/institutions/$(institutionId)).data.courses.has(courseId);
+    }
+    
+    function institutionHasApplication(institutionId, applicationId) {
+      return get(/databases/$(database)/documents/institutions/$(institutionId)).data.applications.has(applicationId);
+    }
+    
+    function companyHasJob(companyId, jobId) {
+      return get(/databases/$(database)/documents/companies/$(companyId)).data.jobs.has(jobId);
+    }
+    
+    function companyHasJobApplication(companyId, jobApplicationId) {
+      return get(/databases/$(database)/documents/companies/$(companyId)).data.jobApplications.has(jobApplicationId);
+    }
+    
+    function companyCanViewTranscript(companyId, transcriptId) {
+      let jobApplication = get(/databases/$(database)/documents/jobApplications/$(resource.data.jobApplicationId));
+      return jobApplication.data.companyId == companyId && jobApplication.data.status == 'approved';
+    }
+    
+    // Validation functions
+    function isValidUserData() {
+      return request.resource.data.keys().hasAll(['email', 'firstName', 'lastName', 'role', 'createdAt']) &&
+             request.resource.data.email is string &&
+             request.resource.data.firstName is string &&
+             request.resource.data.lastName is string &&
+             request.resource.data.role in ['student', 'institution', 'company', 'admin'] &&
+             request.resource.data.createdAt is timestamp;
+    }
+    
+    function isValidCourseData() {
+      return request.resource.data.keys().hasAll(['name', 'institutionId', 'faculty', 'requirements', 'createdAt']) &&
+             request.resource.data.name is string &&
+             request.resource.data.institutionId is string &&
+             request.resource.data.faculty is string &&
+             request.resource.data.requirements is map &&
+             request.resource.data.createdAt is timestamp;
+    }
+    
+    function isValidApplicationData() {
+      return request.resource.data.keys().hasAll(['studentId', 'courseId', 'institutionId', 'status', 'appliedAt']) &&
+             request.resource.data.studentId is string &&
+             request.resource.data.courseId is string &&
+             request.resource.data.institutionId is string &&
+             request.resource.data.status in ['pending', 'approved', 'rejected', 'waitlisted'] &&
+             request.resource.data.appliedAt is timestamp;
+    }
+    
+    function studentHasNotExceededApplicationLimit() {
+      let studentApplications = get(/databases/$(database)/documents/users/$(request.auth.uid)).data.applications;
+      return studentApplications.size() < 2;
+    }
+    
+    function studentMeetsCourseRequirements(courseId) {
+      let course = get(/databases/$(database)/documents/courses/$(courseId));
+      let student = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      return validateRequirements(student.data, course.data.requirements);
+    }
+  }
+}

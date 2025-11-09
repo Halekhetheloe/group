@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<body>
+  <h2>Right-click and save each image below:</h2>
+  
+  <!-- Icon 192x192 -->
+  <h3>1. Right-click → Save as "icon-192.png"</h3>
+  <canvas id="canvas192" width="192" height="192"></canvas>
+  
+  <!-- Icon 512x512 -->
+  <h3>2. Right-click → Save as "icon-512.png"</h3>
+  <canvas id="canvas512" width="512" height="512"></canvas>
+
+  <script>
+    function createIcon(size, canvasId) {
+      const canvas = document.getElementById(canvasId);
+      const ctx = canvas.getContext('2d');
+      
+      // Blue background
+      ctx.fillStyle = '#3B82F6';
+      ctx.fillRect(0, 0, size, size);
+      
+      // White graduation cap
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = `bold ${size * 0.4}px Arial`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('🎓', size/2, size/2);
+    }
+    
+    createIcon(192, 'canvas192');
+    createIcon(512, 'canvas512');
+  </script>
+</body>
+</html>

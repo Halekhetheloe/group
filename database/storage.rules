@@ -1,0 +1,105 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // User profile pictures
+    match /users/{userId}/profile/{fileName} {
+      allow read: if true; // Public read for profile pictures
+      allow write: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null && hasRole(['admin']);
+    }
+    
+    // Student documents (transcripts, certificates, etc.)
+    match /students/{studentId}/documents/{fileName} {
+      allow read: if request.auth != null && (
+        hasRole(['admin']) ||
+        request.auth.uid == studentId ||
+        (hasRole(['company']) && hasAccessToStudentDocuments(companyId, studentId)) ||
+        (hasRole(['institution']) && hasAccessToStudentDocuments(institutionId, studentId))
+      );
+      allow write: if request.auth != null && (
+        hasRole(['admin']) ||
+        request.auth.uid == studentId
+      );
+    }
+    
+    // Institution documents (logos, prospectus, etc.)
+    match /institutions/{institutionId}/documents/{fileName} {
+      allow read: if true; // Public read access
+      allow write: if request.auth != null && (
+        hasRole(['admin']) ||
+        (hasRole(['institution']) && request.auth.uid == resource.data.adminId)
+      );
+    }
+    
+    // Company documents (logos, job attachments, etc.)
+    match /companies/{companyId}/documents/{fileName} {
+      allow read: if true; // Public read access
+      allow write: if request.auth != null && (
+        hasRole(['admin']) ||
+        (hasRole(['company']) && request.auth.uid == resource.data.adminId)
+      );
+    }
+    
+    // System files (admin only)
+    match /system/{fileName} {
+      allow read, write: if request.auth != null && hasRole(['admin']);
+    }
+    
+    // Helper functions
+    function hasRole(roles) {
+      return request.auth.token.role in roles;
+    }
+    
+    function hasAccessToStudentDocuments(organizationId, studentId) {
+      // Companies can access if student applied to their job and application is approved
+      if (hasRole(['company'])) {
+        let jobApplications = get(/databases/$(database)/documents/jobApplications).where('studentId', '==', studentId).where('companyId', '==', organizationId).where('status', '==', 'approved');
+        return jobApplications.size() > 0;
+      }
+      
+      // Institutions can access if student is enrolled or applied
+      if (hasRole(['institution'])) {
+        let applications = get(/databases/$(database)/documents/applications).where('studentId', '==', studentId).where('institutionId', '==', organizationId);
+        return applications.size() > 0;
+      }
+      
+      return false;
+    }
+    
+    // Validation functions
+    function isValidImage() {
+      return request.resource.contentType.matches('image/.*') &&
+             request.resource.size < 5 * 1024 * 1024; // 5MB limit
+    }
+    
+    function isValidDocument() {
+      return request.resource.contentType in [
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'text/plain',
+        'image/jpeg',
+        'image/png'
+      ] && request.resource.size < 10 * 1024 * 1024; // 10MB limit
+    }
+    
+    // Security rules for file types
+    match /{path=**}/profile.{extension} {
+      allow write: if extension in ['jpg', 'jpeg', 'png', 'gif'] && isValidImage();
+    }
+    
+    match /{path=**}/transcript.{extension} {
+      allow write: if extension in ['pdf', 'jpg', 'jpeg', 'png'] && isValidDocument();
+    }
+    
+    match /{path=**}/certificate.{extension} {
+      allow write: if extension in ['pdf', 'jpg', 'jpeg', 'png'] && isValidDocument();
+    }
+    
+    match /{path=**}/logo.{extension} {
+      allow write: if extension in ['jpg', 'jpeg', 'png', 'gif'] && isValidImage();
+    }
+  }
+}
