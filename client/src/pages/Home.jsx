@@ -41,14 +41,6 @@ const Home = () => {
       color: 'orange'
     }
   ]
-
-  const stats = [
-    { number: '50+', label: 'Partner Institutions' },
-    { number: '500+', label: 'Courses Available' },
-    { number: '10,000+', label: 'Students Helped' },
-    { number: '200+', label: 'Partner Companies' }
-  ]
-
   const steps = [
     {
       step: 1,
