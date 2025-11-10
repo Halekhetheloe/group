@@ -132,32 +132,35 @@ const AdminDashboard = () => {
     navigate('/admin/companies')
   }
 
-  const StatCard = ({ title, value, color, change }) => (
-    <div className="stat-card">
-      <div className="flex items-center">
-        <div className={`color-indicator ${color} mr-4`}></div>
-        <div>
-          <p className="stat-title">{title}</p>
-          <p className="stat-value">{loading ? '...' : value}</p>
-          {change && (
-            <p className={`stat-change ${change > 0 ? 'positive' : 'negative'}`}>
-              {change > 0 ? '+' : ''}{change}% from last month
-            </p>
-          )}
-        </div>
+  const StatCard = ({ title, value, change }) => (
+    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:shadow-md transition-shadow duration-200">
+      <div className="flex flex-col">
+        <p className="text-gray-600 text-sm font-medium mb-2">{title}</p>
+        <p className="text-3xl font-bold text-gray-900 mb-2">
+          {loading ? '...' : value}
+        </p>
+        {change && (
+          <p className={`text-sm font-medium ${change > 0 ? 'text-green-600' : 'text-red-600'}`}>
+            {change > 0 ? '+' : ''}{change}% from last month
+          </p>
+        )}
       </div>
     </div>
   )
 
   if (loading) {
     return (
-      <div className="admin-dashboard">
-        <div className="dashboard-container">
+      <div className="min-h-screen bg-gray-50 p-8">
+        <div className="max-w-7xl mx-auto">
           <div className="animate-pulse">
-            <div className="loading-header"></div>
-            <div className="stats-grid">
+            {/* Header Skeleton */}
+            <div className="h-8 bg-gray-300 rounded mb-2 w-1/3"></div>
+            <div className="h-4 bg-gray-300 rounded w-1/2 mb-8"></div>
+            
+            {/* Stats Grid Skeleton */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
               {[...Array(4)].map((_, i) => (
-                <div key={i} className="loading-stat"></div>
+                <div key={i} className="h-32 bg-gray-300 rounded-xl"></div>
               ))}
             </div>
           </div>
@@ -167,60 +170,57 @@ const AdminDashboard = () => {
   }
 
   return (
-    <div className="admin-dashboard">
-      <div className="dashboard-container">
+    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
+      <div className="max-w-7xl mx-auto">
+        
         {/* Header */}
-        <div className="dashboard-header">
-          <h1 className="dashboard-title">Admin Dashboard</h1>
-          <p className="dashboard-subtitle">Welcome to the Career Guidance Platform administration panel</p>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
+          <p className="text-gray-600">Welcome to the Career Guidance Platform administration panel</p>
         </div>
 
         {/* Stats Grid */}
-        <div className="stats-grid">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <StatCard
             title="Total Users"
             value={stats.totalUsers}
-            color="bg-blue"
             change={12}
           />
           <StatCard
             title="Institutions"
             value={stats.totalInstitutions}
-            color="bg-green"
             change={8}
           />
           <StatCard
             title="Companies"
             value={stats.totalCompanies}
-            color="bg-purple"
             change={15}
           />
           <StatCard
             title="Applications"
             value={stats.totalApplications}
-            color="bg-orange"
             change={23}
           />
         </div>
 
         {/* Pending Approvals */}
-        <div className="approvals-grid">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           {/* Pending Institutions */}
-          <div className="approval-card">
-            <div className="approval-header">
-              <h3 className="approval-title">Pending Institutions</h3>
-              <span className="pending-badge">
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Pending Institutions</h3>
+              <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">
                 {stats.pendingInstitutions} pending
               </span>
             </div>
-            <div className="approval-content">
+            <div className="flex flex-col gap-4">
               {stats.pendingInstitutions > 0 ? (
-                <p className="pending-text">{stats.pendingInstitutions} institutions awaiting approval</p>
+                <p className="text-gray-600">{stats.pendingInstitutions} institutions awaiting approval</p>
               ) : (
-                <p className="no-pending">No pending institution approvals</p>
+                <p className="text-gray-600">No pending institution approvals</p>
               )}
               <button 
-                className="manage-btn"
+                className="bg-gray-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-gray-700 transition-colors duration-200 self-start"
                 onClick={handleManageInstitutions}
               >
                 Manage Institutions
@@ -229,21 +229,21 @@ const AdminDashboard = () => {
           </div>
 
           {/* Pending Companies */}
-          <div className="approval-card">
-            <div className="approval-header">
-              <h3 className="approval-title">Pending Companies</h3>
-              <span className="pending-badge">
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Pending Companies</h3>
+              <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">
                 {stats.pendingCompanies} pending
               </span>
             </div>
-            <div className="approval-content">
+            <div className="flex flex-col gap-4">
               {stats.pendingCompanies > 0 ? (
-                <p className="pending-text">{stats.pendingCompanies} companies awaiting approval</p>
+                <p className="text-gray-600">{stats.pendingCompanies} companies awaiting approval</p>
               ) : (
-                <p className="no-pending">No pending company approvals</p>
+                <p className="text-gray-600">No pending company approvals</p>
               )}
               <button 
-                className="manage-btn"
+                className="bg-gray-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-gray-700 transition-colors duration-200 self-start"
                 onClick={handleManageCompanies}
               >
                 Manage Companies
@@ -253,22 +253,16 @@ const AdminDashboard = () => {
         </div>
 
         {/* Recent Activity */}
-        <div className="activity-card">
-          <h3 className="activity-title">Recent Activity</h3>
-          <div className="activity-list">
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h3>
+          <div className="space-y-4">
             {recentActivities.length > 0 ? (
               recentActivities.map(activity => (
-                <div key={activity.id} className="activity-item">
-                  <div className="activity-content">
-                    <div className={`activity-icon ${
-                      activity.type.includes('user') ? 'user-activity' :
-                      activity.type.includes('institution') ? 'institution-activity' :
-                      activity.type.includes('company') ? 'company-activity' :
-                      'default-activity'
-                    }`}></div>
-                    <div className="activity-details">
-                      <p className="activity-message">{activity.message}</p>
-                      <p className="activity-time">
+                <div key={activity.id} className="p-4 rounded-lg bg-gray-50 border border-gray-200">
+                  <div className="flex items-start gap-4">
+                    <div className="flex-1">
+                      <p className="text-gray-900 font-medium mb-1">{activity.message}</p>
+                      <p className="text-gray-500 text-sm">
                         {activity.timestamp.toLocaleDateString()} at {activity.timestamp.toLocaleTimeString()}
                       </p>
                     </div>
@@ -276,7 +270,7 @@ const AdminDashboard = () => {
                 </div>
               ))
             ) : (
-              <p className="no-activities">No recent activities</p>
+              <p className="text-gray-600 text-center py-8">No recent activities</p>
             )}
           </div>
         </div>
