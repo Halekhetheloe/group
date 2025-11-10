@@ -22,6 +22,8 @@ import Jobs from './pages/Jobs'
 import Institutions from './pages/Institutions'
 import About from './pages/About'
 import Contact from './pages/Contact'
+import Privacy from './pages/Privacy'
+import Terms from './pages/Terms'
 
 // Dashboard Redirect
 import DashboardRedirect from './components/shared/DashboardRedirect'
@@ -120,6 +122,8 @@ function App() {
                 <Route path="/verify-email" element={<EmailVerification />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/pending-approval" element={<PendingApprovalRoute />} />
+                <Route path="/privacy" element={<Privacy />} />
+                <Route path="/terms" element={<Terms />} />
 
                 {/* Main Dashboard Route */}
                 <Route

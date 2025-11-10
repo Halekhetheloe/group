@@ -6,7 +6,8 @@ import {
   Send,
   Clock,
   Building,
-  Users
+  Users,
+  Navigation
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -55,13 +56,13 @@ const Contact = () => {
     {
       icon: Mail,
       title: 'Email Us',
-      details: 'info@lesothocareerguide.co.ls',
+      details: 'mokhothuhalekhetheloe@gmail.com',
       description: 'Send us an email anytime'
     },
     {
       icon: Phone,
       title: 'Call Us',
-      details: '+266 2231 3751',
+      details: '+266 57944278',
       description: 'Mon to Fri, 8am to 5pm'
     },
     {
@@ -83,19 +84,19 @@ const Contact = () => {
       icon: Users,
       title: 'Student Support',
       description: 'Get help with applications, courses, and career guidance',
-      contact: 'students@lesothocareerguide.co.ls'
+      contact: 'thomonyaneneo@gmail.com'
     },
     {
       icon: Building,
       title: 'Institution Support',
       description: 'Assistance for partner institutions and course management',
-      contact: 'institutions@lesothocareerguide.co.ls'
+      contact: 'nthethesekete280@gmail.com'
     },
     {
       icon: Users,
       title: 'Company Support',
       description: 'Help with job postings and applicant management',
-      contact: 'companies@lesothocareerguide.co.ls'
+      contact: 'mokhothu@lesothocareerguide.co.ls'
     }
   ]
 
@@ -200,7 +201,7 @@ const Contact = () => {
                       value={formData.name}
                       onChange={handleInputChange}
                       required
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors duration-200"
                       placeholder="Your full name"
                     />
                   </div>
@@ -215,7 +216,7 @@ const Contact = () => {
                       value={formData.email}
                       onChange={handleInputChange}
                       required
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors duration-200"
                       placeholder="your.email@example.com"
                     />
                   </div>
@@ -232,7 +233,7 @@ const Contact = () => {
                       value={formData.subject}
                       onChange={handleInputChange}
                       required
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors duration-200"
                       placeholder="What is this regarding?"
                     />
                   </div>
@@ -245,7 +246,7 @@ const Contact = () => {
                       name="userType"
                       value={formData.userType}
                       onChange={handleInputChange}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors duration-200"
                     >
                       <option value="general">General Inquiry</option>
                       <option value="student">Student/Parent</option>
@@ -266,7 +267,7 @@ const Contact = () => {
                     onChange={handleInputChange}
                     required
                     rows="6"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors duration-200"
                     placeholder="Please describe your inquiry in detail..."
                   />
                 </div>
@@ -274,7 +275,7 @@ const Contact = () => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full bg-blue-600 text-white py-4 px-6 rounded-lg font-semibold text-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                  className="w-full bg-blue-600 text-white py-4 px-6 rounded-lg font-semibold text-lg hover:bg-blue-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transform hover:scale-105 active:scale-95"
                 >
                   {loading ? (
                     <>
@@ -334,13 +335,101 @@ const Contact = () => {
           <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">
             Visit Our Campus
           </h2>
-          <div className="bg-gray-200 rounded-lg h-64 flex items-center justify-center">
-            <div className="text-center text-gray-600">
-              <MapPin className="h-12 w-12 mx-auto mb-4" />
-              <p className="text-lg font-semibold">Limkokwing University</p>
-              <p className="text-sm">Maseru, Lesotho</p>
-              <p className="text-sm mt-2">Campus map would be displayed here</p>
+          
+          {/* Google Maps Embed */}
+          <div className="rounded-lg overflow-hidden h-96 mb-6 shadow-lg">
+            <iframe
+              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3477.215355656729!2d27.47821517596626!3d-29.31485140800526!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x1e8dca3d0d6a4e3d%3A0x7b8b6e1a5a5a5a5a!2sLimkokwing%20University%20of%20Creative%20Technology%20Lesotho!5e0!3m2!1sen!2sls!4v1234567890"
+              width="100%"
+              height="100%"
+              style={{ border: 0 }}
+              allowFullScreen=""
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              title="Limkokwing University Campus Location"
+              className="w-full h-full"
+            >
+            </iframe>
+          </div>
+
+          {/* Location Details and Directions */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="text-center md:text-left">
+              <div className="flex items-center justify-center md:justify-start mb-4">
+                <MapPin className="h-6 w-6 text-blue-600 mr-2" />
+                <h3 className="text-lg font-semibold text-gray-900">Our Location</h3>
+              </div>
+              <div className="space-y-2 text-gray-600">
+                <p className="font-medium">Limkokwing University of Creative Technology</p>
+                <p>Maseru, Lesotho</p>
+                <p className="text-sm mt-2">Main Campus - Innovation Center</p>
+              </div>
             </div>
+
+            <div className="text-center md:text-right">
+              <a
+                href="https://maps.google.com/?q=Limkokwing+University+of+Creative+Technology+Lesotho"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 font-semibold transform hover:scale-105 active:scale-95"
+              >
+                <Navigation className="h-5 w-5 mr-2" />
+                Get Directions
+              </a>
+              <p className="text-sm text-gray-500 mt-2">
+                Opens in Google Maps
+              </p>
+            </div>
+          </div>
+
+          {/* Additional Campus Information */}
+          <div className="mt-6 pt-6 border-t border-gray-200">
+            <h4 className="text-lg font-semibold text-gray-900 mb-4 text-center">
+              Campus Information
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+              <div className="p-4 bg-blue-50 rounded-lg">
+                <Clock className="h-8 w-8 text-blue-600 mx-auto mb-2" />
+                <p className="font-semibold text-gray-900">Visiting Hours</p>
+                <p className="text-sm text-gray-600">Mon - Fri: 8AM - 5PM</p>
+              </div>
+              <div className="p-4 bg-green-50 rounded-lg">
+                <Building className="h-8 w-8 text-green-600 mx-auto mb-2" />
+                <p className="font-semibold text-gray-900">Main Building</p>
+                <p className="text-sm text-gray-600">ICT Department</p>
+              </div>
+              <div className="p-4 bg-purple-50 rounded-lg">
+                <Users className="h-8 w-8 text-purple-600 mx-auto mb-2" />
+                <p className="font-semibold text-gray-900">Support Available</p>
+                <p className="text-sm text-gray-600">Student & Faculty Support</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Contact CTA */}
+        <div className="mt-8 bg-gradient-to-r from-blue-600 to-blue-800 rounded-lg shadow-lg p-8 text-center">
+          <h3 className="text-2xl font-bold text-white mb-4">
+            Need Immediate Assistance?
+          </h3>
+          <p className="text-blue-100 mb-6 text-lg">
+            Call us directly or send an email for urgent inquiries
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <a
+              href="tel:+26622313751"
+              className="inline-flex items-center px-6 py-3 bg-white text-blue-600 rounded-lg font-semibold hover:bg-gray-100 transition-colors duration-200"
+            >
+              <Phone className="h-5 w-5 mr-2" />
+              Call Now: +266 57944278
+            </a>
+            <a
+              href="mailto:mokhothu@lesothocareerguide.co.ls"
+              className="inline-flex items-center px-6 py-3 bg-transparent border-2 border-white text-white rounded-lg font-semibold hover:bg-white hover:text-blue-600 transition-colors duration-200"
+            >
+              <Mail className="h-5 w-5 mr-2" />
+              Email Us
+            </a>
           </div>
         </div>
       </div>

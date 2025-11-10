@@ -319,26 +319,8 @@ const Login = () => {
 
         {/* Demo Accounts */}
         <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-          <h4 className="text-sm font-medium text-blue-800 mb-2">Quick Test Accounts:</h4>
+
           <div className="space-y-2">
-            <button
-              onClick={() => useDemoAccount('student@demo.com', 'password123')}
-              className="w-full text-left p-2 bg-white rounded border text-sm hover:bg-blue-100"
-            >
-              <strong>Student:</strong> student@demo.com
-            </button>
-            <button
-              onClick={() => useDemoAccount('institution@demo.com', 'password123')}
-              className="w-full text-left p-2 bg-white rounded border text-sm hover:bg-blue-100"
-            >
-              <strong>Institution:</strong> institution@demo.com
-            </button>
-            <button
-              onClick={() => useDemoAccount('company@demo.com', 'password123')}
-              className="w-full text-left p-2 bg-white rounded border text-sm hover:bg-blue-100"
-            >
-              <strong>Company:</strong> company@demo.com
-            </button>
           </div>
         </div>
       </div>

@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react'
 import { collection, query, where, getDocs, orderBy, limit, doc, getDoc } from 'firebase/firestore'
 import { db } from '../../firebase-config'
 import { useAuth } from '../../hooks/useAuth'
+import { useNavigate } from 'react-router-dom'
 
 const StudentDashboard = () => {
   const { userData } = useAuth()
+  const navigate = useNavigate()
   const [stats, setStats] = useState({
     totalApplications: 0,
     pendingApplications: 0,
@@ -41,21 +43,39 @@ const StudentDashboard = () => {
         ...doc.data()
       }))
 
-      // Fetch course details for applications
+      // Fetch course details for applications with proper error handling
       const applicationsWithDetails = await Promise.all(
         applications.map(async (app) => {
           try {
+            // Check if courseId exists and is valid
+            if (!app.courseId || typeof app.courseId !== 'string' || app.courseId.trim() === '') {
+              console.warn('Invalid courseId for application:', app.id)
+              return {
+                ...app,
+                course: { name: 'Course information unavailable' }
+              }
+            }
+
             const courseDoc = await getDoc(doc(db, 'courses', app.courseId))
+            
+            if (!courseDoc.exists()) {
+              console.warn('Course not found:', app.courseId)
+              return {
+                ...app,
+                course: { name: 'Course not found' }
+              }
+            }
+
             const courseData = courseDoc.data()
             return {
               ...app,
               course: courseData
             }
           } catch (error) {
-            console.error('Error fetching course details:', error)
+            console.error('Error fetching course details for application:', app.id, error)
             return {
               ...app,
-              course: { name: 'Course not found' }
+              course: { name: 'Error loading course' }
             }
           }
         })
@@ -121,19 +141,66 @@ const StudentDashboard = () => {
     }
   }
 
+  // Navigation handlers
+  const handleViewAllApplications = () => {
+    navigate('/student/applications')
+  }
+
+  const handleViewAllCourses = () => {
+    navigate('/courses')
+  }
+
+  const handleViewAllJobs = () => {
+    navigate('/jobs')
+  }
+
+  const handleBrowseCourses = () => {
+    navigate('/student/courses')
+  }
+
+  const handleMyApplications = () => {
+    navigate('/student/applications')
+  }
+
+  const handleJobSearch = () => {
+    navigate('/student/jobs')
+  }
+
+  const handleMyProfile = () => {
+    navigate('/student/profile')
+  }
+
+  const handleApplyNow = (jobId) => {
+    if (!jobId) {
+      console.error('Job ID is undefined')
+      return
+    }
+    
+    // Use the correct route path that matches your App.jsx
+    navigate(`/jobs/${jobId}/apply`)
+  }
+
+  const handleViewCourse = (courseId) => {
+    if (!courseId) {
+      console.error('Course ID is undefined')
+      return
+    }
+    navigate(`/student/courses`)
+  }
+
   const StatCard = ({ title, value, subtitle, color, onClick }) => (
     <div 
-      className={`card cursor-pointer transform hover:scale-105 transition-transform duration-200 ${onClick ? 'hover:shadow-lg' : ''}`}
+      className={`stat-card ${onClick ? 'cursor-pointer hover:scale-105' : ''}`}
       onClick={onClick}
     >
-      <div className="flex items-center justify-between">
+      <div className="stat-card-content">
         <div>
-          <p className="text-sm font-medium text-gray-600">{title}</p>
-          <p className="text-2xl font-bold text-gray-900">{value}</p>
-          {subtitle && <p className="text-sm text-gray-500">{subtitle}</p>}
+          <p className="stat-card-title">{title}</p>
+          <p className="stat-card-value">{value}</p>
+          {subtitle && <p className="stat-card-subtitle">{subtitle}</p>}
         </div>
-        <div className={`p-3 rounded-lg ${color}`}>
-          <div className="h-6 w-6 text-white"></div>
+        <div className={`stat-card-icon ${color}`}>
+          <div className="stat-icon"></div>
         </div>
       </div>
     </div>
@@ -141,14 +208,18 @@ const StudentDashboard = () => {
 
   const getStatusBadge = (status) => {
     const statusConfig = {
-      pending: { color: 'bg-yellow-100 text-yellow-800', label: 'Pending' },
-      admitted: { color: 'bg-green-100 text-green-800', label: 'Admitted' },
-      rejected: { color: 'bg-red-100 text-red-800', label: 'Rejected' }
+      pending: { color: 'status-badge-pending', label: 'Pending' },
+      admitted: { color: 'status-badge-admitted', label: 'Admitted' },
+      rejected: { color: 'status-badge-rejected', label: 'Rejected' },
+      submitted: { color: 'status-badge-pending', label: 'Submitted' },
+      under_review: { color: 'status-badge-pending', label: 'Under Review' },
+      accepted: { color: 'status-badge-admitted', label: 'Accepted' },
+      declined: { color: 'status-badge-rejected', label: 'Declined' }
     }
-    const config = statusConfig[status] || { color: 'bg-gray-100 text-gray-800', label: status }
+    const config = statusConfig[status] || { color: 'status-badge-default', label: status }
     
     return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.color}`}>
+      <span className={`status-badge ${config.color}`}>
         {config.label}
       </span>
     )
@@ -156,15 +227,29 @@ const StudentDashboard = () => {
 
   const formatDate = (timestamp) => {
     if (!timestamp) return 'N/A'
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp)
-    return date.toLocaleDateString()
+    try {
+      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp)
+      return date.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric' 
+      })
+    } catch (error) {
+      console.error('Error formatting date:', error)
+      return 'Invalid Date'
+    }
   }
 
   const isDeadlineApproaching = (deadline) => {
     if (!deadline) return false
-    const deadlineDate = deadline.toDate ? deadline.toDate() : new Date(deadline)
-    const daysUntilDeadline = Math.ceil((deadlineDate - new Date()) / (1000 * 60 * 60 * 24))
-    return daysUntilDeadline <= 7 && daysUntilDeadline >= 0
+    try {
+      const deadlineDate = deadline.toDate ? deadline.toDate() : new Date(deadline)
+      const daysUntilDeadline = Math.ceil((deadlineDate - new Date()) / (1000 * 60 * 60 * 24))
+      return daysUntilDeadline <= 7 && daysUntilDeadline >= 0
+    } catch (error) {
+      console.error('Error checking deadline:', error)
+      return false
+    }
   }
 
   if (loading) {
@@ -178,6 +263,11 @@ const StudentDashboard = () => {
                 <div key={i} className="h-32 bg-gray-200 rounded-lg"></div>
               ))}
             </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+              <div className="h-64 bg-gray-200 rounded-lg"></div>
+              <div className="h-64 bg-gray-200 rounded-lg"></div>
+            </div>
+            <div className="h-64 bg-gray-200 rounded-lg"></div>
           </div>
         </div>
       </div>
@@ -188,16 +278,16 @@ const StudentDashboard = () => {
     return (
       <div className="min-h-screen bg-gray-50 p-6">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center py-12">
-            <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md mx-auto">
-              <h3 className="text-lg font-semibold text-red-800 mb-2">Dashboard Loading Issue</h3>
-              <p className="text-red-600 mb-4">{error}</p>
-              <p className="text-sm text-red-500 mb-4">
+          <div className="error-container">
+            <div className="error-content">
+              <h3 className="error-title">Dashboard Loading Issue</h3>
+              <p className="error-message">{error}</p>
+              <p className="error-help">
                 This is usually temporary while Firestore indexes are building. Please wait a few minutes and refresh.
               </p>
               <button 
                 onClick={fetchDashboardData}
-                className="btn-primary"
+                className="retry-button"
               >
                 Try Again
               </button>
@@ -212,69 +302,95 @@ const StudentDashboard = () => {
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Student Dashboard</h1>
-          <p className="text-gray-600 mt-2">
-            Welcome back, {userData?.displayName || 'Student'}
+        <div className="dashboard-header">
+          <h1 className="dashboard-title">Student Dashboard</h1>
+          <p className="dashboard-subtitle">
+            Welcome back, {userData?.displayName || 'Student'}! Here's your application overview.
           </p>
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="stats-grid">
           <StatCard
-            title="Applications"
+            title="Total Applications"
             value={stats.totalApplications}
             subtitle={`${stats.pendingApplications} pending`}
-            color="bg-blue-500"
+            color="stat-icon-blue"
+            onClick={handleMyApplications}
           />
           <StatCard
             title="Admissions"
             value={stats.admittedApplications}
             subtitle="Accepted offers"
-            color="bg-green-500"
+            color="stat-icon-green"
           />
           <StatCard
             title="Saved Jobs"
             value={stats.savedJobs}
             subtitle="Opportunities"
-            color="bg-purple-500"
+            color="stat-icon-purple"
+            onClick={handleJobSearch}
           />
           <StatCard
-            title="Notifications"
-            value="0"
-            subtitle="Unread"
-            color="bg-orange-500"
+            title="Upcoming Deadlines"
+            value={upcomingDeadlines.filter(course => 
+              isDeadlineApproaching(course.applicationDeadline)
+            ).length}
+            subtitle="Approaching soon"
+            color="stat-icon-orange"
+            onClick={handleViewAllCourses}
           />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div className="dashboard-grid">
           {/* Recent Applications */}
-          <div className="card">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Recent Applications</h3>
-              <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
+          <div className="dashboard-card">
+            <div className="card-header">
+              <h3 className="card-title">Recent Applications</h3>
+              <button 
+                className="view-all-button"
+                onClick={handleViewAllApplications}
+              >
                 View All
               </button>
             </div>
-            <div className="space-y-4">
-              {recentApplications.map(application => (
-                <div key={application.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div className="flex-1">
-                    <h4 className="font-medium text-gray-900">{application.course?.name}</h4>
-                    <div className="flex items-center text-sm text-gray-600 mt-1">
-                      Applied {formatDate(application.appliedAt)}
+            <div className="card-content">
+              {recentApplications.length > 0 ? (
+                recentApplications.map(application => (
+                  <div 
+                    key={application.id} 
+                    className="application-item"
+                    onClick={() => handleViewCourse(application.courseId)}
+                  >
+                    <div className="application-content">
+                      <h4 className="application-title">
+                        {application.course?.name || 'Unknown Course'}
+                      </h4>
+                      <div className="application-meta">
+                        Applied {formatDate(application.appliedAt)}
+                        {application.course?.institutionName && (
+                          <span className="application-institution">
+                            • {application.course.institutionName}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="application-status">
+                      {getStatusBadge(application.status)}
                     </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    {getStatusBadge(application.status)}
-                  </div>
-                </div>
-              ))}
-              {recentApplications.length === 0 && (
-                <div className="text-center py-8">
-                  <div className="h-12 w-12 text-gray-400 mx-auto mb-4"></div>
-                  <p className="text-gray-500">No applications yet</p>
-                  <button className="btn-primary mt-2">
+                ))
+              ) : (
+                <div className="empty-state">
+                  <div className="empty-icon"></div>
+                  <p className="empty-text">No applications yet</p>
+                  <p className="empty-subtext">
+                    Start your journey by applying to courses
+                  </p>
+                  <button 
+                    className="empty-action-button"
+                    onClick={handleBrowseCourses}
+                  >
                     Browse Courses
                   </button>
                 </div>
@@ -283,40 +399,63 @@ const StudentDashboard = () => {
           </div>
 
           {/* Upcoming Deadlines */}
-          <div className="card">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Upcoming Deadlines</h3>
-              <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
+          <div className="dashboard-card">
+            <div className="card-header">
+              <h3 className="card-title">Upcoming Deadlines</h3>
+              <button 
+                className="view-all-button"
+                onClick={handleViewAllCourses}
+              >
                 View All
               </button>
             </div>
-            <div className="space-y-4">
-              {upcomingDeadlines.map(course => (
-                <div key={course.id} className={`p-4 rounded-lg ${
-                  isDeadlineApproaching(course.applicationDeadline) 
-                    ? 'bg-red-50 border border-red-200' 
-                    : 'bg-gray-50'
-                }`}>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h4 className="font-medium text-gray-900">{course.name}</h4>
-                      <p className="text-sm text-gray-600">{course.institutionName}</p>
+            <div className="card-content">
+              {upcomingDeadlines.length > 0 ? (
+                upcomingDeadlines.map(course => {
+                  const deadlineDate = course.applicationDeadline?.toDate ? course.applicationDeadline.toDate() : new Date(course.applicationDeadline)
+                  const daysUntilDeadline = Math.ceil((deadlineDate - new Date()) / (1000 * 60 * 60 * 24))
+                  
+                  return (
+                    <div 
+                      key={course.id} 
+                      className={`deadline-item ${
+                        isDeadlineApproaching(course.applicationDeadline) 
+                          ? 'deadline-urgent' 
+                          : 'deadline-normal'
+                      }`}
+                      onClick={() => handleViewCourse(course.id)}
+                    >
+                      <div className="deadline-content">
+                        <div className="deadline-header">
+                          <h4 className="deadline-title">{course.name}</h4>
+                          <p className="deadline-institution">{course.institutionName}</p>
+                        </div>
+                        {isDeadlineApproaching(course.applicationDeadline) && (
+                          <span className="urgent-badge">
+                            Soon
+                          </span>
+                        )}
+                      </div>
+                      <div className="deadline-meta">
+                        <span className="deadline-date">
+                          Deadline: {formatDate(course.applicationDeadline)}
+                        </span>
+                        {isDeadlineApproaching(course.applicationDeadline) && (
+                          <span className="days-remaining">
+                            {daysUntilDeadline} days left
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    {isDeadlineApproaching(course.applicationDeadline) && (
-                      <span className="bg-red-100 text-red-800 px-2 py-1 rounded text-xs font-medium">
-                        Soon
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center text-sm text-gray-600 mt-2">
-                    Deadline: {formatDate(course.applicationDeadline)}
-                  </div>
-                </div>
-              ))}
-              {upcomingDeadlines.length === 0 && (
-                <div className="text-center py-8">
-                  <div className="h-12 w-12 text-gray-400 mx-auto mb-4"></div>
-                  <p className="text-gray-500">No upcoming deadlines</p>
+                  )
+                })
+              ) : (
+                <div className="empty-state">
+                  <div className="empty-icon"></div>
+                  <p className="empty-text">No upcoming deadlines</p>
+                  <p className="empty-subtext">
+                    Check back later for new opportunities
+                  </p>
                 </div>
               )}
             </div>
@@ -324,75 +463,769 @@ const StudentDashboard = () => {
         </div>
 
         {/* Recommended Jobs */}
-        <div className="card">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Recommended Jobs</h3>
-            <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
+        <div className="dashboard-card">
+          <div className="card-header">
+            <h3 className="card-title">Recommended Jobs</h3>
+            <button 
+              className="view-all-button"
+              onClick={handleViewAllJobs}
+            >
               View All
             </button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {recommendedJobs.map(job => (
-              <div key={job.id} className="p-4 bg-gray-50 rounded-lg">
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <h4 className="font-medium text-gray-900">{job.title}</h4>
-                    <p className="text-sm text-gray-600">{job.companyName}</p>
+          <div className="jobs-grid">
+            {recommendedJobs.length > 0 ? (
+              recommendedJobs.map(job => (
+                <div key={job.id} className="job-card">
+                  <div className="job-header">
+                    <div>
+                      <h4 className="job-title">{job.title}</h4>
+                      <p className="job-company">{job.companyName}</p>
+                    </div>
+                    <div className="job-icon">💼</div>
                   </div>
-                  <div className="h-5 w-5 text-gray-400"></div>
+                  <div className="job-details">
+                    <div className="job-detail">
+                      <span className="job-type">{job.jobType}</span>
+                      {job.location && (
+                        <span className="job-location">• {job.location}</span>
+                      )}
+                    </div>
+                    <div className="job-detail">
+                      {job.deadline ? (
+                        <span>Deadline: {formatDate(job.deadline)}</span>
+                      ) : (
+                        <span>Open until filled</span>
+                      )}
+                    </div>
+                    {job.salary && (
+                      <div className="job-detail">
+                        <span className="job-salary">{job.salary}</span>
+                      </div>
+                    )}
+                  </div>
+                  <button 
+                    className="apply-now-button"
+                    onClick={() => handleApplyNow(job.id)}
+                  >
+                    Apply Now
+                  </button>
                 </div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center text-gray-600">
-                    {job.jobType}
-                  </div>
-                  <div className="flex items-center text-gray-600">
-                    Deadline: {formatDate(job.deadline)}
-                  </div>
-                </div>
-                <button className="w-full btn-primary mt-3 text-sm">
-                  Apply Now
-                </button>
-              </div>
-            ))}
-            {recommendedJobs.length === 0 && (
-              <div className="col-span-3 text-center py-8">
-                <div className="h-12 w-12 text-gray-400 mx-auto mb-4"></div>
-                <p className="text-gray-500">No recommended jobs yet</p>
-                <p className="text-sm text-gray-400 mt-1">
+              ))
+            ) : (
+              <div className="empty-jobs-state">
+                <div className="empty-icon">🔍</div>
+                <p className="empty-text">No recommended jobs yet</p>
+                <p className="empty-subtext">
                   Complete your profile to get better job recommendations
                 </p>
+                <button 
+                  className="empty-action-button"
+                  onClick={handleMyProfile}
+                >
+                  Update Profile
+                </button>
               </div>
             )}
           </div>
         </div>
 
         {/* Quick Actions */}
-        <div className="card mt-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <button className="flex flex-col items-center p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors duration-200">
-              <div className="h-8 w-8 text-blue-600 mb-2"></div>
-              <span className="font-medium text-blue-900">Browse Courses</span>
-              <span className="text-sm text-blue-700 mt-1">Find programs</span>
+        <div className="dashboard-card">
+          <h3 className="card-title">Quick Actions</h3>
+          <div className="quick-actions-grid">
+            <button 
+              className="quick-action-card quick-action-blue"
+              onClick={handleBrowseCourses}
+            >
+              <div className="action-icon action-icon-blue">🎓</div>
+              <span className="action-title">Browse Courses</span>
+              <span className="action-subtitle">Find programs</span>
             </button>
-            <button className="flex flex-col items-center p-4 bg-green-50 rounded-lg hover:bg-green-100 transition-colors duration-200">
-              <div className="h-8 w-8 text-green-600 mb-2"></div>
-              <span className="font-medium text-green-900">My Applications</span>
-              <span className="text-sm text-green-700 mt-1">View status</span>
+            <button 
+              className="quick-action-card quick-action-green"
+              onClick={handleMyApplications}
+            >
+              <div className="action-icon action-icon-green">📋</div>
+              <span className="action-title">My Applications</span>
+              <span className="action-subtitle">View status</span>
             </button>
-            <button className="flex flex-col items-center p-4 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors duration-200">
-              <div className="h-8 w-8 text-purple-600 mb-2"></div>
-              <span className="font-medium text-purple-900">Job Search</span>
-              <span className="text-sm text-purple-700 mt-1">Find opportunities</span>
+            <button 
+              className="quick-action-card quick-action-purple"
+              onClick={handleJobSearch}
+            >
+              <div className="action-icon action-icon-purple">💼</div>
+              <span className="action-title">Job Search</span>
+              <span className="action-subtitle">Find opportunities</span>
             </button>
-            <button className="flex flex-col items-center p-4 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors duration-200">
-              <div className="h-8 w-8 text-orange-600 mb-2"></div>
-              <span className="font-medium text-orange-900">My Profile</span>
-              <span className="text-sm text-orange-700 mt-1">Update information</span>
+            <button 
+              className="quick-action-card quick-action-orange"
+              onClick={handleMyProfile}
+            >
+              <div className="action-icon action-icon-orange">👤</div>
+              <span className="action-title">My Profile</span>
+              <span className="action-subtitle">Update information</span>
             </button>
           </div>
         </div>
       </div>
+
+      {/* Add the CSS styles */}
+      <style jsx>{`
+        .dashboard-header {
+          margin-bottom: 2rem;
+        }
+
+        .dashboard-title {
+          font-size: 1.875rem;
+          font-weight: bold;
+          color: #111827;
+          margin-bottom: 0.5rem;
+        }
+
+        .dashboard-subtitle {
+          color: #6b7280;
+          font-size: 1.125rem;
+        }
+
+        .stats-grid {
+          display: grid;
+          grid-template-columns: repeat(1, 1fr);
+          gap: 1.5rem;
+          margin-bottom: 2rem;
+        }
+
+        @media (min-width: 768px) {
+          .stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+        }
+
+        @media (min-width: 1024px) {
+          .stats-grid {
+            grid-template-columns: repeat(4, 1fr);
+          }
+        }
+
+        .stat-card {
+          background: white;
+          border-radius: 0.75rem;
+          border: 1px solid #e5e7eb;
+          box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+          padding: 1.5rem;
+          transition: all 0.2s;
+          cursor: pointer;
+        }
+
+        .stat-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-card-content {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+        }
+
+        .stat-card-title {
+          font-size: 0.875rem;
+          font-weight: 500;
+          color: #6b7280;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+        }
+
+        .stat-card-value {
+          font-size: 1.875rem;
+          font-weight: bold;
+          color: #111827;
+          margin: 0.5rem 0;
+        }
+
+        .stat-card-subtitle {
+          font-size: 0.875rem;
+          color: #6b7280;
+        }
+
+        .stat-card-icon {
+          padding: 0.75rem;
+          border-radius: 0.5rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .stat-icon-blue {
+          background-color: #3b82f6;
+        }
+
+        .stat-icon-green {
+          background-color: #10b981;
+        }
+
+        .stat-icon-purple {
+          background-color: #8b5cf6;
+        }
+
+        .stat-icon-orange {
+          background-color: #f59e0b;
+        }
+
+        .stat-icon {
+          height: 1.5rem;
+          width: 1.5rem;
+          background: white;
+          border-radius: 50%;
+        }
+
+        .dashboard-grid {
+          display: grid;
+          grid-template-columns: repeat(1, 1fr);
+          gap: 1.5rem;
+          margin-bottom: 2rem;
+        }
+
+        @media (min-width: 1024px) {
+          .dashboard-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+        }
+
+        .dashboard-card {
+          background: white;
+          border-radius: 0.75rem;
+          border: 1px solid #e5e7eb;
+          box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+          padding: 1.5rem;
+        }
+
+        .card-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 1.5rem;
+          padding-bottom: 1rem;
+          border-bottom: 1px solid #e5e7eb;
+        }
+
+        .card-title {
+          font-size: 1.25rem;
+          font-weight: 600;
+          color: #111827;
+        }
+
+        .view-all-button {
+          color: #2563eb;
+          font-size: 0.875rem;
+          font-weight: 500;
+          background: none;
+          border: none;
+          cursor: pointer;
+          transition: color 0.2s;
+          padding: 0.5rem 1rem;
+          border-radius: 0.375rem;
+        }
+
+        .view-all-button:hover {
+          color: #1d4ed8;
+          background-color: #f3f4f6;
+        }
+
+        .card-content {
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+        }
+
+        .application-item {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 1rem;
+          background-color: #f9fafb;
+          border-radius: 0.5rem;
+          cursor: pointer;
+          transition: all 0.2s;
+          border: 1px solid transparent;
+        }
+
+        .application-item:hover {
+          background-color: #f3f4f6;
+          border-color: #e5e7eb;
+          transform: translateY(-1px);
+        }
+
+        .application-content {
+          flex: 1;
+        }
+
+        .application-title {
+          font-weight: 600;
+          color: #111827;
+          margin-bottom: 0.25rem;
+        }
+
+        .application-meta {
+          display: flex;
+          align-items: center;
+          font-size: 0.875rem;
+          color: #6b7280;
+          gap: 0.5rem;
+        }
+
+        .application-institution {
+          color: #374151;
+          font-weight: 500;
+        }
+
+        .application-status {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+        }
+
+        .status-badge {
+          display: inline-flex;
+          align-items: center;
+          padding: 0.375rem 0.75rem;
+          border-radius: 9999px;
+          font-size: 0.75rem;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+        }
+
+        .status-badge-pending {
+          background-color: #fef3c7;
+          color: #92400e;
+        }
+
+        .status-badge-admitted {
+          background-color: #d1fae5;
+          color: #065f46;
+        }
+
+        .status-badge-rejected {
+          background-color: #fee2e2;
+          color: #991b1b;
+        }
+
+        .status-badge-default {
+          background-color: #f3f4f6;
+          color: #374151;
+        }
+
+        .deadline-item {
+          padding: 1.25rem;
+          border-radius: 0.5rem;
+          cursor: pointer;
+          transition: all 0.2s;
+          border: 1px solid transparent;
+        }
+
+        .deadline-normal {
+          background-color: #f9fafb;
+        }
+
+        .deadline-urgent {
+          background-color: #fef2f2;
+          border-color: #fecaca;
+        }
+
+        .deadline-item:hover {
+          background-color: #f3f4f6;
+          transform: translateY(-1px);
+        }
+
+        .deadline-content {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          margin-bottom: 0.75rem;
+        }
+
+        .deadline-header {
+          flex: 1;
+        }
+
+        .deadline-title {
+          font-weight: 600;
+          color: #111827;
+          margin-bottom: 0.25rem;
+        }
+
+        .deadline-institution {
+          font-size: 0.875rem;
+          color: #6b7280;
+        }
+
+        .deadline-meta {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          font-size: 0.875rem;
+          color: #6b7280;
+        }
+
+        .deadline-date {
+          font-weight: 500;
+        }
+
+        .days-remaining {
+          color: #dc2626;
+          font-weight: 600;
+        }
+
+        .urgent-badge {
+          background-color: #dc2626;
+          color: white;
+          padding: 0.25rem 0.75rem;
+          border-radius: 0.25rem;
+          font-size: 0.75rem;
+          font-weight: 600;
+          text-transform: uppercase;
+        }
+
+        .jobs-grid {
+          display: grid;
+          grid-template-columns: repeat(1, 1fr);
+          gap: 1.5rem;
+        }
+
+        @media (min-width: 768px) {
+          .jobs-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+        }
+
+        @media (min-width: 1024px) {
+          .jobs-grid {
+            grid-template-columns: repeat(3, 1fr);
+          }
+        }
+
+        .job-card {
+          padding: 1.5rem;
+          background-color: #f9fafb;
+          border-radius: 0.5rem;
+          border: 1px solid #e5e7eb;
+          transition: all 0.2s;
+        }
+
+        .job-card:hover {
+          background-color: #f3f4f6;
+          transform: translateY(-2px);
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .job-header {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          margin-bottom: 1rem;
+        }
+
+        .job-title {
+          font-weight: 600;
+          color: #111827;
+          margin-bottom: 0.25rem;
+        }
+
+        .job-company {
+          font-size: 0.875rem;
+          color: #6b7280;
+          font-weight: 500;
+        }
+
+        .job-icon {
+          font-size: 1.5rem;
+        }
+
+        .job-details {
+          display: flex;
+          flex-direction: column;
+          gap: 0.75rem;
+          font-size: 0.875rem;
+          margin-bottom: 1.5rem;
+        }
+
+        .job-detail {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          color: #6b7280;
+        }
+
+        .job-type, .job-location, .job-salary {
+          font-weight: 500;
+        }
+
+        .job-type {
+          color: #374151;
+        }
+
+        .job-salary {
+          color: #059669;
+        }
+
+        .apply-now-button {
+          width: 100%;
+          background-color: #2563eb;
+          color: white;
+          padding: 0.75rem 1.5rem;
+          border-radius: 0.5rem;
+          font-size: 0.875rem;
+          font-weight: 600;
+          border: none;
+          cursor: pointer;
+          transition: background-color 0.2s;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+        }
+
+        .apply-now-button:hover {
+          background-color: #1d4ed8;
+          transform: translateY(-1px);
+        }
+
+        .quick-actions-grid {
+          display: grid;
+          grid-template-columns: repeat(1, 1fr);
+          gap: 1rem;
+        }
+
+        @media (min-width: 768px) {
+          .quick-actions-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+        }
+
+        @media (min-width: 1024px) {
+          .quick-actions-grid {
+            grid-template-columns: repeat(4, 1fr);
+          }
+        }
+
+        .quick-action-card {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          padding: 2rem 1rem;
+          border-radius: 0.75rem;
+          border: none;
+          cursor: pointer;
+          transition: all 0.2s;
+          text-align: center;
+        }
+
+        .quick-action-blue {
+          background-color: #dbeafe;
+        }
+
+        .quick-action-blue:hover {
+          background-color: #bfdbfe;
+          transform: translateY(-2px);
+        }
+
+        .quick-action-green {
+          background-color: #d1fae5;
+        }
+
+        .quick-action-green:hover {
+          background-color: #a7f3d0;
+          transform: translateY(-2px);
+        }
+
+        .quick-action-purple {
+          background-color: #e9d5ff;
+        }
+
+        .quick-action-purple:hover {
+          background-color: #d8b4fe;
+          transform: translateY(-2px);
+        }
+
+        .quick-action-orange {
+          background-color: #fed7aa;
+        }
+
+        .quick-action-orange:hover {
+          background-color: #fdba74;
+          transform: translateY(-2px);
+        }
+
+        .action-icon {
+          height: 3rem;
+          width: 3rem;
+          margin-bottom: 1rem;
+          font-size: 1.5rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 50%;
+        }
+
+        .action-icon-blue {
+          background-color: #3b82f6;
+          color: white;
+        }
+
+        .action-icon-green {
+          background-color: #10b981;
+          color: white;
+        }
+
+        .action-icon-purple {
+          background-color: #8b5cf6;
+          color: white;
+        }
+
+        .action-icon-orange {
+          background-color: #f59e0b;
+          color: white;
+        }
+
+        .action-title {
+          font-weight: 600;
+          margin-bottom: 0.5rem;
+          font-size: 1.125rem;
+        }
+
+        .quick-action-blue .action-title {
+          color: #1e40af;
+        }
+
+        .quick-action-green .action-title {
+          color: #065f46;
+        }
+
+        .quick-action-purple .action-title {
+          color: #5b21b6;
+        }
+
+        .quick-action-orange .action-title {
+          color: #9a3412;
+        }
+
+        .action-subtitle {
+          font-size: 0.875rem;
+          opacity: 0.8;
+        }
+
+        .quick-action-blue .action-subtitle {
+          color: #3730a3;
+        }
+
+        .quick-action-green .action-subtitle {
+          color: #047857;
+        }
+
+        .quick-action-purple .action-subtitle {
+          color: #4c1d95;
+        }
+
+        .quick-action-orange .action-subtitle {
+          color: #7c2d12;
+        }
+
+        .empty-state, .empty-jobs-state {
+          text-align: center;
+          padding: 3rem 2rem;
+        }
+
+        .empty-icon {
+          height: 4rem;
+          width: 4rem;
+          color: #9ca3af;
+          margin-left: auto;
+          margin-right: auto;
+          margin-bottom: 1rem;
+          font-size: 2.5rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .empty-text {
+          color: #6b7280;
+          font-size: 1.125rem;
+          font-weight: 500;
+          margin-bottom: 0.5rem;
+        }
+
+        .empty-subtext {
+          font-size: 0.875rem;
+          color: #9ca3af;
+          margin-bottom: 1.5rem;
+        }
+
+        .empty-action-button {
+          background-color: #2563eb;
+          color: white;
+          padding: 0.75rem 1.5rem;
+          border-radius: 0.5rem;
+          font-size: 0.875rem;
+          font-weight: 500;
+          border: none;
+          cursor: pointer;
+          transition: background-color 0.2s;
+        }
+
+        .empty-action-button:hover {
+          background-color: #1d4ed8;
+        }
+
+        .error-container {
+          text-align: center;
+          padding: 4rem 2rem;
+        }
+
+        .error-content {
+          background-color: #fef2f2;
+          border: 1px solid #fecaca;
+          border-radius: 0.75rem;
+          padding: 2rem;
+          max-width: 32rem;
+          margin-left: auto;
+          margin-right: auto;
+        }
+
+        .error-title {
+          font-size: 1.25rem;
+          font-weight: 600;
+          color: #991b1b;
+          margin-bottom: 1rem;
+        }
+
+        .error-message {
+          color: #dc2626;
+          margin-bottom: 1.5rem;
+        }
+
+        .error-help {
+          font-size: 0.875rem;
+          color: #b91c1c;
+          margin-bottom: 1.5rem;
+          line-height: 1.5;
+        }
+
+        .retry-button {
+          background-color: #dc2626;
+          color: white;
+          padding: 0.75rem 1.5rem;
+          border-radius: 0.5rem;
+          font-size: 0.875rem;
+          font-weight: 500;
+          border: none;
+          cursor: pointer;
+          transition: background-color 0.2s;
+        }
+
+        .retry-button:hover {
+          background-color: #b91c1c;
+        }
+      `}</style>
     </div>
   )
 }

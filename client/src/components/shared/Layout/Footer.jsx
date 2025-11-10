@@ -8,7 +8,8 @@ import {
   Facebook, 
   Twitter, 
   Linkedin,
-  Heart
+  Heart,
+  Users
 } from 'lucide-react'
 
 const Footer = () => {
@@ -35,13 +36,36 @@ const Footer = () => {
     { name: 'System Documentation', path: '/docs' }
   ]
 
+  const developmentTeam = [
+    { 
+      name: 'Mokhothu Halekhetheloe', 
+      email: 'mokhothuhalekhetheloe@gmail.com',
+      role: 'Lead Developer'
+    },
+    { 
+      name: 'Nthethe Sekete', 
+      email: 'nthethesekete280@gmail.com',
+      role: 'Backend Developer'
+    },
+    { 
+      name: 'Phone Contact', 
+      phone: '+266 5794 4278',
+      role: 'Support'
+    },
+    { 
+      name: 'Admin Access', 
+      credential: 'ID: 5123456',
+      role: 'System Admin'
+    }
+  ]
+
   return (
     <footer className="bg-gray-900 text-white">
       {/* Main Footer Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
           {/* Brand Section */}
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-2">
             <Link to="/" className="flex items-center space-x-2 mb-4">
               <div className="bg-blue-600 text-white p-2 rounded-lg">
                 <GraduationCap className="h-6 w-6" />
@@ -102,9 +126,9 @@ const Footer = () => {
             </ul>
           </div>
 
-          {/* Contact Information */}
+          {/* Contact & Development Team */}
           <div>
-            <h3 className="text-lg font-semibold mb-4 text-blue-400">Contact Info</h3>
+            <h3 className="text-lg font-semibold mb-4 text-blue-400">Contact & Team</h3>
             <div className="space-y-3">
               <div className="flex items-center space-x-3">
                 <MapPin className="h-4 w-4 text-blue-400" />
@@ -125,8 +149,33 @@ const Footer = () => {
               </div>
             </div>
 
-            {/* Institution Resources */}
+            {/* Development Team */}
             <div className="mt-6">
+              <h4 className="text-md font-medium mb-2 text-blue-400 flex items-center">
+                <Users className="h-4 w-4 mr-2" />
+                Development Team
+              </h4>
+              <div className="space-y-2 text-xs text-gray-300">
+                {developmentTeam.map((member, index) => (
+                  <div key={index} className="border-l-2 border-blue-400 pl-2">
+                    <p className="font-medium">{member.name}</p>
+                    <p className="text-gray-400">{member.role}</p>
+                    {member.email && (
+                      <p className="text-gray-500">{member.email}</p>
+                    )}
+                    {member.phone && (
+                      <p className="text-gray-500">{member.phone}</p>
+                    )}
+                    {member.credential && (
+                      <p className="text-gray-500">{member.credential}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Institution Resources */}
+            <div className="mt-4">
               <h4 className="text-md font-medium mb-2 text-blue-400">For Institutions</h4>
               <ul className="space-y-1">
                 {institutionResources.map((resource) => (
@@ -181,6 +230,18 @@ const Footer = () => {
             </p>
             <p className="text-xs text-gray-500 mt-1">
               BSc. in Information Technology | BSc. in Business Information Technology | Diploma in IT
+            </p>
+            <p className="text-xs text-gray-400 mt-2 font-medium">
+              System Credentials Available for Authorized Personnel
+            </p>
+          </div>
+
+          {/* Security Notice */}
+          <div className="mt-3 p-3 bg-gray-800 rounded-lg">
+            <p className="text-xs text-gray-400 text-center">
+              🔒 <strong>Secure Access:</strong> This platform is protected. Contact development team for authorized access.
+              <br />
+              <span className="text-yellow-400">Authorized Emails: mokhothuhalekhetheloe@gmail.com | nthethesekete280@gmail.com</span>
             </p>
           </div>
         </div>
