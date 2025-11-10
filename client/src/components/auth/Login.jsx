@@ -1,9 +1,7 @@
-// client/src/components/auth/Login.jsx
 import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth'
 import { auth } from '../../firebase-config'
-import { Eye, EyeOff, Mail, Lock, AlertCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const Login = () => {
@@ -152,21 +150,13 @@ const Login = () => {
     }
   }
 
-  // Test with demo account
-  const useDemoAccount = (email, password) => {
-    setFormData({
-      email: email,
-      password: password
-    })
-  }
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         {/* Header */}
         <div className="text-center">
           <div className="mx-auto h-12 w-12 bg-blue-600 rounded-full flex items-center justify-center">
-            <span className="text-white font-bold text-lg">🎓</span>
+            <span className="text-white font-bold text-lg">CG</span>
           </div>
           <h2 className="mt-6 text-3xl font-bold text-gray-900">
             Sign in to your account
@@ -184,26 +174,20 @@ const Login = () => {
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
                 Email Address
               </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  className={`relative block w-full pl-10 pr-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${
-                    errors.email ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''
-                  }`}
-                  placeholder="Enter your email"
-                />
-              </div>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                value={formData.email}
+                onChange={handleChange}
+                className={`w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${
+                  errors.email ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''
+                }`}
+                placeholder="Enter your email"
+              />
               {errors.email && (
-                <p className="mt-1 text-sm text-red-600 flex items-center">
-                  <AlertCircle className="h-4 w-4 mr-1" />
+                <p className="mt-1 text-sm text-red-600">
                   {errors.email}
                 </p>
               )}
@@ -215,9 +199,6 @@ const Login = () => {
                 Password
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-gray-400" />
-                </div>
                 <input
                   id="password"
                   name="password"
@@ -225,7 +206,7 @@ const Login = () => {
                   autoComplete="current-password"
                   value={formData.password}
                   onChange={handleChange}
-                  className={`relative block w-full pl-10 pr-10 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${
+                  className={`w-full px-3 py-2 pr-10 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${
                     errors.password ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''
                   }`}
                   placeholder="Enter your password"
@@ -235,16 +216,13 @@ const Login = () => {
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
                   onClick={() => setShowPassword(!showPassword)}
                 >
-                  {showPassword ? (
-                    <EyeOff className="h-5 w-5 text-gray-400" />
-                  ) : (
-                    <Eye className="h-5 w-5 text-gray-400" />
-                  )}
+                  <span className="text-gray-500 text-sm">
+                    {showPassword ? 'Hide' : 'Show'}
+                  </span>
                 </button>
               </div>
               {errors.password && (
-                <p className="mt-1 text-sm text-red-600 flex items-center">
-                  <AlertCircle className="h-4 w-4 mr-1" />
+                <p className="mt-1 text-sm text-red-600">
                   {errors.password}
                 </p>
               )}
@@ -277,13 +255,8 @@ const Login = () => {
           {/* Submit Error */}
           {errors.submit && (
             <div className="rounded-md bg-red-50 p-4">
-              <div className="flex">
-                <AlertCircle className="h-5 w-5 text-red-400" />
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-red-800">
-                    {errors.submit}
-                  </h3>
-                </div>
+              <div className="text-sm text-red-800">
+                {errors.submit}
               </div>
             </div>
           )}
@@ -316,13 +289,6 @@ const Login = () => {
             </p>
           </div>
         </form>
-
-        {/* Demo Accounts */}
-        <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-
-          <div className="space-y-2">
-          </div>
-        </div>
       </div>
     </div>
   )

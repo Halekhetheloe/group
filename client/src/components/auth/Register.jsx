@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom'
 import { createUserWithEmailAndPassword, sendEmailVerification, updateProfile } from 'firebase/auth'
 import { doc, setDoc } from 'firebase/firestore'
 import { auth, db } from '../../firebase-config'
-import { Eye, EyeOff, Mail, Lock, User, Building2, Briefcase, GraduationCap, AlertCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const Register = () => {
@@ -173,14 +172,6 @@ const Register = () => {
     }
   }
 
-  const handleRoleChange = (role) => {
-    console.log('Role changed to:', role)
-    setFormData(prev => ({
-      ...prev,
-      role: role
-    }))
-  }
-
   const getRoleDescription = (role) => {
     switch (role) {
       case 'student':
@@ -200,7 +191,7 @@ const Register = () => {
         {/* Header */}
         <div className="text-center">
           <div className="mx-auto h-12 w-12 bg-blue-600 rounded-full flex items-center justify-center">
-            <span className="text-white font-bold text-lg">🎓</span>
+            <span className="text-white font-bold text-lg">CG</span>
           </div>
           <h2 className="mt-6 text-3xl font-bold text-gray-900">
             Create your account
@@ -218,26 +209,20 @@ const Register = () => {
               <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-1">
                 Full Name
               </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <User className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  id="fullName"
-                  name="fullName"
-                  type="text"
-                  autoComplete="name"
-                  value={formData.fullName}
-                  onChange={handleChange}
-                  className={`relative block w-full pl-10 pr-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${
-                    errors.fullName ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''
-                  }`}
-                  placeholder="Enter your full name"
-                />
-              </div>
+              <input
+                id="fullName"
+                name="fullName"
+                type="text"
+                autoComplete="name"
+                value={formData.fullName}
+                onChange={handleChange}
+                className={`w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${
+                  errors.fullName ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''
+                }`}
+                placeholder="Enter your full name"
+              />
               {errors.fullName && (
-                <p className="mt-1 text-sm text-red-600 flex items-center">
-                  <AlertCircle className="h-4 w-4 mr-1" />
+                <p className="mt-1 text-sm text-red-600">
                   {errors.fullName}
                 </p>
               )}
@@ -248,69 +233,42 @@ const Register = () => {
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
                 Email Address
               </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  className={`relative block w-full pl-10 pr-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${
-                    errors.email ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''
-                  }`}
-                  placeholder="Enter your email"
-                />
-              </div>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                value={formData.email}
+                onChange={handleChange}
+                className={`w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${
+                  errors.email ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''
+                }`}
+                placeholder="Enter your email"
+              />
               {errors.email && (
-                <p className="mt-1 text-sm text-red-600 flex items-center">
-                  <AlertCircle className="h-4 w-4 mr-1" />
+                <p className="mt-1 text-sm text-red-600">
                   {errors.email}
                 </p>
               )}
             </div>
 
-            {/* Role Selection - Fixed */}
+            {/* Role Selection - Dropdown */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-1">
                 I am a
               </label>
-              <div className="grid grid-cols-3 gap-3">
-                {[
-                  { value: 'student', label: 'Student', icon: GraduationCap },
-                  { value: 'institution', label: 'Institution', icon: Building2 },
-                  { value: 'company', label: 'Company', icon: Briefcase }
-                ].map((role) => {
-                  const Icon = role.icon
-                  const isSelected = formData.role === role.value
-                  
-                  return (
-                    <button
-                      key={role.value}
-                      type="button"
-                      onClick={() => handleRoleChange(role.value)}
-                      className={`
-                        flex flex-col items-center p-3 border-2 rounded-lg 
-                        transition-all duration-200 select-none
-                        focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
-                        ${isSelected 
-                          ? 'border-blue-500 bg-blue-500 text-white shadow-sm' 
-                          : 'border-gray-300 bg-white text-gray-900 hover:border-blue-300 hover:bg-gray-50'
-                        }
-                      `}
-                    >
-                      <Icon className="h-6 w-6 mb-2" />
-                      <span className="text-sm font-medium text-center">
-                        {role.label}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-              <p className="text-xs text-gray-500 mt-2 text-center">
+              <select
+                id="role"
+                name="role"
+                value={formData.role}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              >
+                <option value="student">Student</option>
+                <option value="institution">Institution</option>
+                <option value="company">Company</option>
+              </select>
+              <p className="text-xs text-gray-500 mt-2">
                 {getRoleDescription(formData.role)}
               </p>
             </div>
@@ -327,14 +285,13 @@ const Register = () => {
                   type="text"
                   value={formData.institutionName}
                   onChange={handleChange}
-                  className={`relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${
+                  className={`w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${
                     errors.institutionName ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''
                   }`}
                   placeholder="Enter your institution name"
                 />
                 {errors.institutionName && (
-                  <p className="mt-1 text-sm text-red-600 flex items-center">
-                    <AlertCircle className="h-4 w-4 mr-1" />
+                  <p className="mt-1 text-sm text-red-600">
                     {errors.institutionName}
                   </p>
                 )}
@@ -353,14 +310,13 @@ const Register = () => {
                   type="text"
                   value={formData.companyName}
                   onChange={handleChange}
-                  className={`relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${
+                  className={`w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${
                     errors.companyName ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''
                   }`}
                   placeholder="Enter your company name"
                 />
                 {errors.companyName && (
-                  <p className="mt-1 text-sm text-red-600 flex items-center">
-                    <AlertCircle className="h-4 w-4 mr-1" />
+                  <p className="mt-1 text-sm text-red-600">
                     {errors.companyName}
                   </p>
                 )}
@@ -373,9 +329,6 @@ const Register = () => {
                 Password
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-gray-400" />
-                </div>
                 <input
                   id="password"
                   name="password"
@@ -383,7 +336,7 @@ const Register = () => {
                   autoComplete="new-password"
                   value={formData.password}
                   onChange={handleChange}
-                  className={`relative block w-full pl-10 pr-10 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${
+                  className={`w-full px-3 py-2 pr-10 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${
                     errors.password ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''
                   }`}
                   placeholder="Create a password"
@@ -393,16 +346,13 @@ const Register = () => {
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
                   onClick={() => setShowPassword(!showPassword)}
                 >
-                  {showPassword ? (
-                    <EyeOff className="h-5 w-5 text-gray-400" />
-                  ) : (
-                    <Eye className="h-5 w-5 text-gray-400" />
-                  )}
+                  <span className="text-gray-500 text-sm">
+                    {showPassword ? 'Hide' : 'Show'}
+                  </span>
                 </button>
               </div>
               {errors.password && (
-                <p className="mt-1 text-sm text-red-600 flex items-center">
-                  <AlertCircle className="h-4 w-4 mr-1" />
+                <p className="mt-1 text-sm text-red-600">
                   {errors.password}
                 </p>
               )}
@@ -414,9 +364,6 @@ const Register = () => {
                 Confirm Password
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-gray-400" />
-                </div>
                 <input
                   id="confirmPassword"
                   name="confirmPassword"
@@ -424,7 +371,7 @@ const Register = () => {
                   autoComplete="new-password"
                   value={formData.confirmPassword}
                   onChange={handleChange}
-                  className={`relative block w-full pl-10 pr-10 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${
+                  className={`w-full px-3 py-2 pr-10 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${
                     errors.confirmPassword ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''
                   }`}
                   placeholder="Confirm your password"
@@ -434,16 +381,13 @@ const Register = () => {
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                 >
-                  {showConfirmPassword ? (
-                    <EyeOff className="h-5 w-5 text-gray-400" />
-                  ) : (
-                    <Eye className="h-5 w-5 text-gray-400" />
-                  )}
+                  <span className="text-gray-500 text-sm">
+                    {showConfirmPassword ? 'Hide' : 'Show'}
+                  </span>
                 </button>
               </div>
               {errors.confirmPassword && (
-                <p className="mt-1 text-sm text-red-600 flex items-center">
-                  <AlertCircle className="h-4 w-4 mr-1" />
+                <p className="mt-1 text-sm text-red-600">
                   {errors.confirmPassword}
                 </p>
               )}
@@ -453,13 +397,8 @@ const Register = () => {
           {/* Submit Error */}
           {errors.submit && (
             <div className="rounded-md bg-red-50 p-4">
-              <div className="flex">
-                <AlertCircle className="h-5 w-5 text-red-400" />
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-red-800">
-                    {errors.submit}
-                  </h3>
-                </div>
+              <div className="text-sm text-red-800">
+                {errors.submit}
               </div>
             </div>
           )}
