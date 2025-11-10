@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { collection, getDocs, updateDoc, doc } from 'firebase/firestore'
 import { db } from '../../firebase-config'
-import { Search, Building, CheckCircle, XCircle, Clock, MapPin, Phone, Mail, Users } from 'lucide-react'
 
 const CompanyManagement = () => {
   const [companies, setCompanies] = useState([])
@@ -71,31 +70,29 @@ const CompanyManagement = () => {
 
   const getStatusBadge = (status) => {
     const statusConfig = {
-      approved: { color: 'bg-green-100 text-green-800', icon: CheckCircle },
-      pending: { color: 'bg-yellow-100 text-yellow-800', icon: Clock },
-      suspended: { color: 'bg-red-100 text-red-800', icon: XCircle }
+      approved: { color: 'status-approved', label: 'Approved' },
+      pending: { color: 'status-pending', label: 'Pending' },
+      suspended: { color: 'status-suspended', label: 'Suspended' }
     }
-    const config = statusConfig[status] || { color: 'bg-gray-100 text-gray-800', icon: Clock }
-    const Icon = config.icon
+    const config = statusConfig[status] || { color: 'status-default', label: status }
     
     return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.color}`}>
-        <Icon className="h-3 w-3 mr-1" />
-        {status.charAt(0).toUpperCase() + status.slice(1)}
+      <span className={`status-badge ${config.color}`}>
+        {config.label}
       </span>
     )
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 p-6">
-        <div className="max-w-7xl mx-auto">
+      <div className="company-management">
+        <div className="management-container">
           <div className="animate-pulse">
-            <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
-            <div className="h-12 bg-gray-200 rounded mb-6"></div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="loading-header"></div>
+            <div className="loading-search"></div>
+            <div className="companies-grid">
               {[...Array(6)].map((_, i) => (
-                <div key={i} className="h-48 bg-gray-200 rounded-lg"></div>
+                <div key={i} className="loading-card"></div>
               ))}
             </div>
           </div>
@@ -105,32 +102,31 @@ const CompanyManagement = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Company Management</h1>
-          <p className="text-gray-600 mt-2">Manage partner companies in the system</p>
+    <div className="company-management">
+      <div className="management-container">
+        <div className="management-header">
+          <h1 className="management-title">Company Management</h1>
+          <p className="management-subtitle">Manage partner companies in the system</p>
         </div>
 
-        <div className="card mb-6">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
-            <div className="flex-1 max-w-md">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+        <div className="filters-card">
+          <div className="filters-container">
+            <div className="search-container">
+              <div className="search-wrapper">
                 <input
                   type="text"
                   placeholder="Search companies by name, industry, or email..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="input-field pl-10"
+                  className="search-input"
                 />
               </div>
             </div>
-            <div className="flex space-x-4">
+            <div className="filter-controls">
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="input-field"
+                className="filter-select"
               >
                 <option value="all">All Status</option>
                 <option value="pending">Pending</option>
@@ -141,63 +137,59 @@ const CompanyManagement = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="companies-grid">
           {filteredCompanies.map((company) => (
-            <div key={company.id} className="card">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center space-x-3">
-                  <div className="p-2 bg-purple-100 rounded-lg">
-                    <Building className="h-6 w-6 text-purple-600" />
-                  </div>
+            <div key={company.id} className="company-card">
+              <div className="card-header">
+                <div className="company-info">
+                  <div className="company-avatar"></div>
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900">{company.name}</h3>
+                    <h3 className="company-name">{company.name}</h3>
                     {getStatusBadge(company.status)}
                   </div>
                 </div>
               </div>
 
-              <div className="space-y-2 mb-4">
-                <div className="flex items-center text-sm text-gray-600">
-                  <Mail className="h-4 w-4 mr-2" />
-                  {company.email}
+              <div className="company-details">
+                <div className="detail-item">
+                  <span className="detail-label">Email:</span>
+                  <span className="detail-value">{company.email}</span>
                 </div>
-                <div className="flex items-center text-sm text-gray-600">
-                  <MapPin className="h-4 w-4 mr-2" />
-                  {company.location || 'Location not specified'}
+                <div className="detail-item">
+                  <span className="detail-label">Location:</span>
+                  <span className="detail-value">{company.location || 'Location not specified'}</span>
                 </div>
                 {company.phone && (
-                  <div className="flex items-center text-sm text-gray-600">
-                    <Phone className="h-4 w-4 mr-2" />
-                    {company.phone}
+                  <div className="detail-item">
+                    <span className="detail-label">Phone:</span>
+                    <span className="detail-value">{company.phone}</span>
                   </div>
                 )}
                 {company.industry && (
-                  <div className="flex items-center text-sm text-gray-600">
-                    <Users className="h-4 w-4 mr-2" />
-                    {company.industry}
+                  <div className="detail-item">
+                    <span className="detail-label">Industry:</span>
+                    <span className="detail-value">{company.industry}</span>
                   </div>
                 )}
               </div>
 
-              <div className="text-sm text-gray-600 mb-4 line-clamp-2">
+              <div className="company-description">
                 {company.description || 'No description provided.'}
               </div>
 
-              <div className="flex space-x-2">
+              <div className="action-buttons">
                 {company.status === 'pending' && (
                   <>
                     <button
                       onClick={() => updateCompanyStatus(company.id, 'approved')}
-                      className="btn-success flex-1 text-sm"
+                      className="btn-approve"
                     >
-                      <CheckCircle className="h-4 w-4 mr-1" />
                       Approve
                     </button>
                     <button
                       onClick={() => updateCompanyStatus(company.id, 'suspended')}
-                      className="btn-danger flex-1 text-sm"
+                      className="btn-reject"
                     >
-                      <XCircle className="h-4 w-4 mr-1" />
                       Reject
                     </button>
                   </>
@@ -206,9 +198,8 @@ const CompanyManagement = () => {
                 {company.status === 'approved' && (
                   <button
                     onClick={() => updateCompanyStatus(company.id, 'suspended')}
-                    className="btn-danger w-full text-sm"
+                    className="btn-suspend"
                   >
-                    <XCircle className="h-4 w-4 mr-1" />
                     Suspend
                   </button>
                 )}
@@ -216,17 +207,16 @@ const CompanyManagement = () => {
                 {company.status === 'suspended' && (
                   <button
                     onClick={() => updateCompanyStatus(company.id, 'approved')}
-                    className="btn-success w-full text-sm"
+                    className="btn-reactivate"
                   >
-                    <CheckCircle className="h-4 w-4 mr-1" />
                     Reactivate
                   </button>
                 )}
               </div>
 
               {company.createdAt && (
-                <div className="mt-3 pt-3 border-t border-gray-200">
-                  <p className="text-xs text-gray-500">
+                <div className="card-footer">
+                  <p className="registration-date">
                     Registered: {company.createdAt.toDate?.().toLocaleDateString() || 'N/A'}
                   </p>
                 </div>
@@ -236,10 +226,10 @@ const CompanyManagement = () => {
         </div>
 
         {filteredCompanies.length === 0 && (
-          <div className="text-center py-12">
-            <Building className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No companies found</h3>
-            <p className="mt-1 text-sm text-gray-500">
+          <div className="empty-state">
+            <div className="empty-avatar"></div>
+            <h3 className="empty-title">No companies found</h3>
+            <p className="empty-description">
               {companies.length === 0 ? 'No companies registered yet.' : 'Try changing your filters.'}
             </p>
           </div>

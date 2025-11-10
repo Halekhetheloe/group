@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { collection, getDocs, query, where } from 'firebase/firestore'
 import { db } from '../../firebase-config'
-import { Download, Filter, Calendar, Users, Building2, Briefcase, FileText, TrendingUp } from 'lucide-react'
 
 const Reports = () => {
   const [reports, setReports] = useState({
@@ -111,35 +110,33 @@ const Reports = () => {
     alert(`Exporting ${type} report...`)
   }
 
-  const StatCard = ({ title, value, subtitle, icon: Icon, color, trend }) => (
-    <div className="card">
-      <div className="flex items-center justify-between">
+  const StatCard = ({ title, value, subtitle, color, trend }) => (
+    <div className="stat-card">
+      <div className="stat-content">
         <div>
-          <p className="text-sm font-medium text-gray-600">{title}</p>
-          <p className="text-2xl font-bold text-gray-900">{value}</p>
-          {subtitle && <p className="text-sm text-gray-500">{subtitle}</p>}
+          <p className="stat-title">{title}</p>
+          <p className="stat-value">{value}</p>
+          {subtitle && <p className="stat-subtitle">{subtitle}</p>}
           {trend && (
-            <p className={`text-sm ${trend > 0 ? 'text-green-600' : 'text-red-600'}`}>
+            <p className={`stat-trend ${trend > 0 ? 'positive' : 'negative'}`}>
               {trend > 0 ? '↑' : '↓'} {Math.abs(trend)}% from last period
             </p>
           )}
         </div>
-        <div className={`p-3 rounded-lg ${color}`}>
-          <Icon className="h-6 w-6 text-white" />
-        </div>
+        <div className={`stat-icon ${color}`}></div>
       </div>
     </div>
   )
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 p-6">
-        <div className="max-w-7xl mx-auto">
+      <div className="reports-page">
+        <div className="reports-container">
           <div className="animate-pulse">
-            <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="loading-header"></div>
+            <div className="stats-grid">
               {[...Array(4)].map((_, i) => (
-                <div key={i} className="h-32 bg-gray-200 rounded-lg"></div>
+                <div key={i} className="loading-stat"></div>
               ))}
             </div>
           </div>
@@ -149,148 +146,141 @@ const Reports = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
+    <div className="reports-page">
+      <div className="reports-container">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">System Reports</h1>
-            <p className="text-gray-600 mt-2">Comprehensive analytics and insights</p>
+        <div className="reports-header">
+          <div className="header-content">
+            <h1 className="reports-title">System Reports</h1>
+            <p className="reports-subtitle">Comprehensive analytics and insights</p>
           </div>
-          <div className="flex space-x-4 mt-4 md:mt-0">
+          <div className="header-controls">
             <select
               value={dateRange}
               onChange={(e) => setDateRange(e.target.value)}
-              className="input-field"
+              className="date-select"
             >
               <option value="7days">Last 7 days</option>
               <option value="30days">Last 30 days</option>
               <option value="90days">Last 90 days</option>
               <option value="1year">Last year</option>
             </select>
-            <button className="btn-primary flex items-center">
-              <Download className="h-4 w-4 mr-2" />
+            <button className="export-btn">
               Export Report
             </button>
           </div>
         </div>
 
         {/* Key Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="stats-grid">
           <StatCard
             title="Total Users"
             value={reports.userGrowth[reports.userGrowth.length - 1]?.users || 0}
-            icon={Users}
-            color="bg-blue-500"
+            color="bg-blue"
             trend={12}
           />
           <StatCard
             title="Applications"
             value={reports.applicationStats.total || 0}
             subtitle={`${reports.applicationStats.approvalRate}% approval rate`}
-            icon={FileText}
-            color="bg-green-500"
+            color="bg-green"
             trend={8}
           />
           <StatCard
             title="Institutions"
             value={reports.institutionStats.total || 0}
             subtitle={`${reports.institutionStats.approved} approved`}
-            icon={Building2}
-            color="bg-purple-500"
+            color="bg-purple"
             trend={15}
           />
           <StatCard
             title="Companies"
             value={reports.companyStats.total || 0}
             subtitle={`${reports.companyStats.approved} approved`}
-            icon={Briefcase}
-            color="bg-orange-500"
+            color="bg-orange"
             trend={23}
           />
         </div>
 
         {/* Detailed Reports */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div className="detailed-reports">
           {/* Application Statistics */}
-          <div className="card">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Application Statistics</h3>
+          <div className="report-card">
+            <div className="report-header">
+              <h3 className="report-title">Application Statistics</h3>
               <button 
                 onClick={() => exportReport('applications')}
-                className="btn-secondary text-sm"
+                className="export-small-btn"
               >
-                <Download className="h-4 w-4 mr-1" />
                 Export
               </button>
             </div>
-            <div className="space-y-4">
-              <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                <span className="text-sm font-medium">Total Applications</span>
-                <span className="font-bold">{reports.applicationStats.total}</span>
+            <div className="stats-list">
+              <div className="stat-item total">
+                <span className="stat-label">Total Applications</span>
+                <span className="stat-number">{reports.applicationStats.total}</span>
               </div>
-              <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
-                <span className="text-sm font-medium text-blue-700">Pending</span>
-                <span className="font-bold text-blue-700">{reports.applicationStats.pending}</span>
+              <div className="stat-item pending">
+                <span className="stat-label">Pending</span>
+                <span className="stat-number">{reports.applicationStats.pending}</span>
               </div>
-              <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
-                <span className="text-sm font-medium text-green-700">Approved</span>
-                <span className="font-bold text-green-700">{reports.applicationStats.approved}</span>
+              <div className="stat-item approved">
+                <span className="stat-label">Approved</span>
+                <span className="stat-number">{reports.applicationStats.approved}</span>
               </div>
-              <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg">
-                <span className="text-sm font-medium text-red-700">Rejected</span>
-                <span className="font-bold text-red-700">{reports.applicationStats.rejected}</span>
+              <div className="stat-item rejected">
+                <span className="stat-label">Rejected</span>
+                <span className="stat-number">{reports.applicationStats.rejected}</span>
               </div>
             </div>
           </div>
 
           {/* Institution & Company Status */}
-          <div className="card">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Partner Status</h3>
+          <div className="report-card">
+            <div className="report-header">
+              <h3 className="report-title">Partner Status</h3>
               <button 
                 onClick={() => exportReport('partners')}
-                className="btn-secondary text-sm"
+                className="export-small-btn"
               >
-                <Download className="h-4 w-4 mr-1" />
                 Export
               </button>
             </div>
-            <div className="space-y-6">
+            <div className="partner-stats">
               {/* Institutions */}
-              <div>
-                <h4 className="font-medium text-gray-900 mb-3">Institutions</h4>
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="text-center p-2 bg-green-50 rounded">
-                    <div className="font-bold text-green-700">{reports.institutionStats.approved}</div>
-                    <div className="text-xs text-green-600">Approved</div>
+              <div className="partner-section">
+                <h4 className="partner-title">Institutions</h4>
+                <div className="status-grid">
+                  <div className="status-item approved">
+                    <div className="status-count">{reports.institutionStats.approved}</div>
+                    <div className="status-label">Approved</div>
                   </div>
-                  <div className="text-center p-2 bg-yellow-50 rounded">
-                    <div className="font-bold text-yellow-700">{reports.institutionStats.pending}</div>
-                    <div className="text-xs text-yellow-600">Pending</div>
+                  <div className="status-item pending">
+                    <div className="status-count">{reports.institutionStats.pending}</div>
+                    <div className="status-label">Pending</div>
                   </div>
-                  <div className="text-center p-2 bg-red-50 rounded">
-                    <div className="font-bold text-red-700">{reports.institutionStats.suspended}</div>
-                    <div className="text-xs text-red-600">Suspended</div>
+                  <div className="status-item suspended">
+                    <div className="status-count">{reports.institutionStats.suspended}</div>
+                    <div className="status-label">Suspended</div>
                   </div>
                 </div>
               </div>
 
               {/* Companies */}
-              <div>
-                <h4 className="font-medium text-gray-900 mb-3">Companies</h4>
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="text-center p-2 bg-green-50 rounded">
-                    <div className="font-bold text-green-700">{reports.companyStats.approved}</div>
-                    <div className="text-xs text-green-600">Approved</div>
+              <div className="partner-section">
+                <h4 className="partner-title">Companies</h4>
+                <div className="status-grid">
+                  <div className="status-item approved">
+                    <div className="status-count">{reports.companyStats.approved}</div>
+                    <div className="status-label">Approved</div>
                   </div>
-                  <div className="text-center p-2 bg-yellow-50 rounded">
-                    <div className="font-bold text-yellow-700">{reports.companyStats.pending}</div>
-                    <div className="text-xs text-yellow-600">Pending</div>
+                  <div className="status-item pending">
+                    <div className="status-count">{reports.companyStats.pending}</div>
+                    <div className="status-label">Pending</div>
                   </div>
-                  <div className="text-center p-2 bg-red-50 rounded">
-                    <div className="font-bold text-red-700">{reports.companyStats.suspended}</div>
-                    <div className="text-xs text-red-600">Suspended</div>
+                  <div className="status-item suspended">
+                    <div className="status-count">{reports.companyStats.suspended}</div>
+                    <div className="status-label">Suspended</div>
                   </div>
                 </div>
               </div>
@@ -299,12 +289,12 @@ const Reports = () => {
         </div>
 
         {/* User Growth Chart Placeholder */}
-        <div className="card">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">User Growth</h3>
-          <div className="bg-gray-50 rounded-lg p-8 text-center">
-            <TrendingUp className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-600">User growth chart visualization</p>
-            <p className="text-sm text-gray-500 mt-2">
+        <div className="report-card">
+          <h3 className="report-title">User Growth</h3>
+          <div className="chart-placeholder">
+            <div className="chart-icon"></div>
+            <p className="chart-text">User growth chart visualization</p>
+            <p className="chart-description">
               In a real implementation, this would show a line chart of user registration over time
             </p>
           </div>

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { collection, getDocs, updateDoc, doc, query, where } from 'firebase/firestore'
 import { db } from '../../firebase-config'
-import { Search, Building2, CheckCircle, XCircle, Clock, MapPin, Phone, Mail } from 'lucide-react'
 
 const InstitutionManagement = () => {
   const [institutions, setInstitutions] = useState([])
@@ -74,31 +73,29 @@ const InstitutionManagement = () => {
 
   const getStatusBadge = (status) => {
     const statusConfig = {
-      approved: { color: 'bg-green-100 text-green-800', icon: CheckCircle },
-      pending: { color: 'bg-yellow-100 text-yellow-800', icon: Clock },
-      suspended: { color: 'bg-red-100 text-red-800', icon: XCircle }
+      approved: { color: 'status-approved', label: 'Approved' },
+      pending: { color: 'status-pending', label: 'Pending' },
+      suspended: { color: 'status-suspended', label: 'Suspended' }
     }
-    const config = statusConfig[status] || { color: 'bg-gray-100 text-gray-800', icon: Clock }
-    const Icon = config.icon
+    const config = statusConfig[status] || { color: 'status-default', label: status }
     
     return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.color}`}>
-        <Icon className="h-3 w-3 mr-1" />
-        {status.charAt(0).toUpperCase() + status.slice(1)}
+      <span className={`status-badge ${config.color}`}>
+        {config.label}
       </span>
     )
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 p-6">
-        <div className="max-w-7xl mx-auto">
+      <div className="institution-management">
+        <div className="management-container">
           <div className="animate-pulse">
-            <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
-            <div className="h-12 bg-gray-200 rounded mb-6"></div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="loading-header"></div>
+            <div className="loading-search"></div>
+            <div className="institutions-grid">
               {[...Array(6)].map((_, i) => (
-                <div key={i} className="h-48 bg-gray-200 rounded-lg"></div>
+                <div key={i} className="loading-card"></div>
               ))}
             </div>
           </div>
@@ -108,34 +105,33 @@ const InstitutionManagement = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
+    <div className="institution-management">
+      <div className="management-container">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Institution Management</h1>
-          <p className="text-gray-600 mt-2">Manage higher learning institutions in the system</p>
+        <div className="management-header">
+          <h1 className="management-title">Institution Management</h1>
+          <p className="management-subtitle">Manage higher learning institutions in the system</p>
         </div>
 
         {/* Filters and Search */}
-        <div className="card mb-6">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
-            <div className="flex-1 max-w-md">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+        <div className="filters-card">
+          <div className="filters-container">
+            <div className="search-container">
+              <div className="search-wrapper">
                 <input
                   type="text"
                   placeholder="Search institutions by name, email, or location..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="input-field pl-10"
+                  className="search-input"
                 />
               </div>
             </div>
-            <div className="flex space-x-4">
+            <div className="filter-controls">
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="input-field"
+                className="filter-select"
               >
                 <option value="all">All Status</option>
                 <option value="pending">Pending</option>
@@ -147,58 +143,54 @@ const InstitutionManagement = () => {
         </div>
 
         {/* Institutions Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="institutions-grid">
           {filteredInstitutions.map((institution) => (
-            <div key={institution.id} className="card">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center space-x-3">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <Building2 className="h-6 w-6 text-blue-600" />
-                  </div>
+            <div key={institution.id} className="institution-card">
+              <div className="card-header">
+                <div className="institution-info">
+                  <div className="institution-avatar"></div>
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900">{institution.name}</h3>
+                    <h3 className="institution-name">{institution.name}</h3>
                     {getStatusBadge(institution.status)}
                   </div>
                 </div>
               </div>
 
-              <div className="space-y-2 mb-4">
-                <div className="flex items-center text-sm text-gray-600">
-                  <Mail className="h-4 w-4 mr-2" />
-                  {institution.email}
+              <div className="institution-details">
+                <div className="detail-item">
+                  <span className="detail-label">Email:</span>
+                  <span className="detail-value">{institution.email}</span>
                 </div>
-                <div className="flex items-center text-sm text-gray-600">
-                  <MapPin className="h-4 w-4 mr-2" />
-                  {institution.location || 'Location not specified'}
+                <div className="detail-item">
+                  <span className="detail-label">Location:</span>
+                  <span className="detail-value">{institution.location || 'Location not specified'}</span>
                 </div>
                 {institution.phone && (
-                  <div className="flex items-center text-sm text-gray-600">
-                    <Phone className="h-4 w-4 mr-2" />
-                    {institution.phone}
+                  <div className="detail-item">
+                    <span className="detail-label">Phone:</span>
+                    <span className="detail-value">{institution.phone}</span>
                   </div>
                 )}
               </div>
 
-              <div className="text-sm text-gray-600 mb-4 line-clamp-2">
+              <div className="institution-description">
                 {institution.description || 'No description provided.'}
               </div>
 
               {/* Action Buttons */}
-              <div className="flex space-x-2">
+              <div className="action-buttons">
                 {institution.status === 'pending' && (
                   <>
                     <button
                       onClick={() => updateInstitutionStatus(institution.id, 'approved')}
-                      className="btn-success flex-1 text-sm"
+                      className="btn-approve"
                     >
-                      <CheckCircle className="h-4 w-4 mr-1" />
                       Approve
                     </button>
                     <button
                       onClick={() => updateInstitutionStatus(institution.id, 'suspended')}
-                      className="btn-danger flex-1 text-sm"
+                      className="btn-reject"
                     >
-                      <XCircle className="h-4 w-4 mr-1" />
                       Reject
                     </button>
                   </>
@@ -207,9 +199,8 @@ const InstitutionManagement = () => {
                 {institution.status === 'approved' && (
                   <button
                     onClick={() => updateInstitutionStatus(institution.id, 'suspended')}
-                    className="btn-danger w-full text-sm"
+                    className="btn-suspend"
                   >
-                    <XCircle className="h-4 w-4 mr-1" />
                     Suspend
                   </button>
                 )}
@@ -217,17 +208,16 @@ const InstitutionManagement = () => {
                 {institution.status === 'suspended' && (
                   <button
                     onClick={() => updateInstitutionStatus(institution.id, 'approved')}
-                    className="btn-success w-full text-sm"
+                    className="btn-reactivate"
                   >
-                    <CheckCircle className="h-4 w-4 mr-1" />
                     Reactivate
                   </button>
                 )}
               </div>
 
               {institution.createdAt && (
-                <div className="mt-3 pt-3 border-t border-gray-200">
-                  <p className="text-xs text-gray-500">
+                <div className="card-footer">
+                  <p className="registration-date">
                     Registered: {institution.createdAt.toDate?.().toLocaleDateString() || 'N/A'}
                   </p>
                 </div>
@@ -237,10 +227,10 @@ const InstitutionManagement = () => {
         </div>
 
         {filteredInstitutions.length === 0 && (
-          <div className="text-center py-12">
-            <Building2 className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No institutions found</h3>
-            <p className="mt-1 text-sm text-gray-500">
+          <div className="empty-state">
+            <div className="empty-avatar"></div>
+            <h3 className="empty-title">No institutions found</h3>
+            <p className="empty-description">
               {institutions.length === 0 ? 'No institutions registered yet.' : 'Try changing your filters.'}
             </p>
           </div>

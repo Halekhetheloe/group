@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
-import { collection, getDocs, query, where } from 'firebase/firestore'
+import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore'
 import { db } from '../../firebase-config'
+import { useNavigate } from 'react-router-dom'
 
 const AdminDashboard = () => {
   const [stats, setStats] = useState({
@@ -13,6 +14,7 @@ const AdminDashboard = () => {
   })
   const [recentActivities, setRecentActivities] = useState([])
   const [loading, setLoading] = useState(true)
+  const navigate = useNavigate()
 
   useEffect(() => {
     fetchDashboardData()
@@ -25,22 +27,25 @@ const AdminDashboard = () => {
       // Fetch all users count by role
       const usersQuery = query(collection(db, 'users'))
       const usersSnapshot = await getDocs(usersQuery)
-      const users = usersSnapshot.docs.map(doc => doc.data())
+      const users = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
       
       // Fetch institutions
       const institutionsQuery = query(collection(db, 'institutions'))
       const institutionsSnapshot = await getDocs(institutionsQuery)
-      const institutions = institutionsSnapshot.docs.map(doc => doc.data())
+      const institutions = institutionsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
       
       // Fetch companies
       const companiesQuery = query(collection(db, 'companies'))
       const companiesSnapshot = await getDocs(companiesQuery)
-      const companies = companiesSnapshot.docs.map(doc => doc.data())
+      const companies = companiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
       
       // Fetch applications
       const applicationsQuery = query(collection(db, 'applications'))
       const applicationsSnapshot = await getDocs(applicationsQuery)
-      const applications = applicationsSnapshot.docs.map(doc => doc.data())
+      const applications = applicationsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+
+      // Fetch recent activities from actual data
+      await fetchRecentActivities(users, institutions, companies)
 
       setStats({
         totalUsers: users.length,
@@ -51,8 +56,6 @@ const AdminDashboard = () => {
         pendingCompanies: companies.filter(comp => comp.status === 'pending').length
       })
 
-      
-
     } catch (error) {
       console.error('Error fetching dashboard data:', error)
     } finally {
@@ -60,17 +63,84 @@ const AdminDashboard = () => {
     }
   }
 
+  const fetchRecentActivities = async (users, institutions, companies) => {
+    try {
+      const activities = []
+
+      // Get recent users (last 5)
+      const recentUsers = users
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .slice(0, 5)
+
+      recentUsers.forEach(user => {
+        activities.push({
+          id: user.id,
+          message: `New user registration: ${user.name || user.email}`,
+          type: 'user_registered',
+          timestamp: user.createdAt ? new Date(user.createdAt.seconds * 1000) : new Date()
+        })
+      })
+
+      // Get pending institutions
+      const pendingInstitutions = institutions
+        .filter(inst => inst.status === 'pending')
+        .slice(0, 3)
+
+      pendingInstitutions.forEach(inst => {
+        activities.push({
+          id: inst.id,
+          message: `Institution "${inst.name}" submitted for approval`,
+          type: 'institution_pending',
+          timestamp: inst.createdAt ? new Date(inst.createdAt.seconds * 1000) : new Date()
+        })
+      })
+
+      // Get recently approved companies
+      const recentCompanies = companies
+        .filter(comp => comp.status === 'approved')
+        .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt))
+        .slice(0, 2)
+
+      recentCompanies.forEach(company => {
+        activities.push({
+          id: company.id,
+          message: `Company "${company.name}" approved`,
+          type: 'company_approved',
+          timestamp: company.updatedAt ? new Date(company.updatedAt.seconds * 1000) : 
+                    company.createdAt ? new Date(company.createdAt.seconds * 1000) : new Date()
+        })
+      })
+
+      // Sort all activities by timestamp and take top 10
+      const sortedActivities = activities
+        .sort((a, b) => b.timestamp - a.timestamp)
+        .slice(0, 10)
+
+      setRecentActivities(sortedActivities)
+
+    } catch (error) {
+      console.error('Error fetching recent activities:', error)
+      setRecentActivities([])
+    }
+  }
+
+  const handleManageInstitutions = () => {
+    navigate('/admin/institutions')
+  }
+
+  const handleManageCompanies = () => {
+    navigate('/admin/companies')
+  }
+
   const StatCard = ({ title, value, color, change }) => (
-    <div className="card">
+    <div className="stat-card">
       <div className="flex items-center">
-        <div className={`p-3 rounded-lg ${color} mr-4`}>
-          <div className="h-6 w-6 text-white"></div>
-        </div>
+        <div className={`color-indicator ${color} mr-4`}></div>
         <div>
-          <p className="text-sm font-medium text-gray-600">{title}</p>
-          <p className="text-2xl font-bold text-gray-900">{loading ? '...' : value}</p>
+          <p className="stat-title">{title}</p>
+          <p className="stat-value">{loading ? '...' : value}</p>
           {change && (
-            <p className={`text-sm ${change > 0 ? 'text-green-600' : 'text-red-600'}`}>
+            <p className={`stat-change ${change > 0 ? 'positive' : 'negative'}`}>
               {change > 0 ? '+' : ''}{change}% from last month
             </p>
           )}
@@ -81,13 +151,13 @@ const AdminDashboard = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 p-6">
-        <div className="max-w-7xl mx-auto">
+      <div className="admin-dashboard">
+        <div className="dashboard-container">
           <div className="animate-pulse">
-            <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="loading-header"></div>
+            <div className="stats-grid">
               {[...Array(4)].map((_, i) => (
-                <div key={i} className="h-32 bg-gray-200 rounded-lg"></div>
+                <div key={i} className="loading-stat"></div>
               ))}
             </div>
           </div>
@@ -97,79 +167,85 @@ const AdminDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
+    <div className="admin-dashboard">
+      <div className="dashboard-container">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-          <p className="text-gray-600 mt-2">Welcome to the Career Guidance Platform administration panel</p>
+        <div className="dashboard-header">
+          <h1 className="dashboard-title">Admin Dashboard</h1>
+          <p className="dashboard-subtitle">Welcome to the Career Guidance Platform administration panel</p>
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="stats-grid">
           <StatCard
             title="Total Users"
             value={stats.totalUsers}
-            color="bg-blue-500"
+            color="bg-blue"
             change={12}
           />
           <StatCard
             title="Institutions"
             value={stats.totalInstitutions}
-            color="bg-green-500"
+            color="bg-green"
             change={8}
           />
           <StatCard
             title="Companies"
             value={stats.totalCompanies}
-            color="bg-purple-500"
+            color="bg-purple"
             change={15}
           />
           <StatCard
             title="Applications"
             value={stats.totalApplications}
-            color="bg-orange-500"
+            color="bg-orange"
             change={23}
           />
         </div>
 
         {/* Pending Approvals */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div className="approvals-grid">
           {/* Pending Institutions */}
-          <div className="card">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Pending Institutions</h3>
-              <span className="bg-yellow-100 text-yellow-800 text-sm font-medium px-2.5 py-0.5 rounded">
+          <div className="approval-card">
+            <div className="approval-header">
+              <h3 className="approval-title">Pending Institutions</h3>
+              <span className="pending-badge">
                 {stats.pendingInstitutions} pending
               </span>
             </div>
-            <div className="space-y-3">
+            <div className="approval-content">
               {stats.pendingInstitutions > 0 ? (
-                <p className="text-gray-600">{stats.pendingInstitutions} institutions awaiting approval</p>
+                <p className="pending-text">{stats.pendingInstitutions} institutions awaiting approval</p>
               ) : (
-                <p className="text-gray-500 text-sm">No pending institution approvals</p>
+                <p className="no-pending">No pending institution approvals</p>
               )}
-              <button className="btn-primary text-sm">
+              <button 
+                className="manage-btn"
+                onClick={handleManageInstitutions}
+              >
                 Manage Institutions
               </button>
             </div>
           </div>
 
           {/* Pending Companies */}
-          <div className="card">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Pending Companies</h3>
-              <span className="bg-yellow-100 text-yellow-800 text-sm font-medium px-2.5 py-0.5 rounded">
+          <div className="approval-card">
+            <div className="approval-header">
+              <h3 className="approval-title">Pending Companies</h3>
+              <span className="pending-badge">
                 {stats.pendingCompanies} pending
               </span>
             </div>
-            <div className="space-y-3">
+            <div className="approval-content">
               {stats.pendingCompanies > 0 ? (
-                <p className="text-gray-600">{stats.pendingCompanies} companies awaiting approval</p>
+                <p className="pending-text">{stats.pendingCompanies} companies awaiting approval</p>
               ) : (
-                <p className="text-gray-500 text-sm">No pending company approvals</p>
+                <p className="no-pending">No pending company approvals</p>
               )}
-              <button className="btn-primary text-sm">
+              <button 
+                className="manage-btn"
+                onClick={handleManageCompanies}
+              >
                 Manage Companies
               </button>
             </div>
@@ -177,29 +253,31 @@ const AdminDashboard = () => {
         </div>
 
         {/* Recent Activity */}
-        <div className="card">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h3>
-          <div className="space-y-3">
-            {recentActivities.map(activity => (
-              <div key={activity.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <div className={`p-2 rounded-full ${
-                    activity.type.includes('user') ? 'bg-blue-100 text-blue-600' :
-                    activity.type.includes('institution') ? 'bg-green-100 text-green-600' :
-                    activity.type.includes('company') ? 'bg-purple-100 text-purple-600' :
-                    'bg-orange-100 text-orange-600'
-                  }`}>
-                    <div className="h-4 w-4"></div>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">{activity.message}</p>
-                    <p className="text-xs text-gray-500">
-                      {activity.timestamp.toLocaleDateString()} at {activity.timestamp.toLocaleTimeString()}
-                    </p>
+        <div className="activity-card">
+          <h3 className="activity-title">Recent Activity</h3>
+          <div className="activity-list">
+            {recentActivities.length > 0 ? (
+              recentActivities.map(activity => (
+                <div key={activity.id} className="activity-item">
+                  <div className="activity-content">
+                    <div className={`activity-icon ${
+                      activity.type.includes('user') ? 'user-activity' :
+                      activity.type.includes('institution') ? 'institution-activity' :
+                      activity.type.includes('company') ? 'company-activity' :
+                      'default-activity'
+                    }`}></div>
+                    <div className="activity-details">
+                      <p className="activity-message">{activity.message}</p>
+                      <p className="activity-time">
+                        {activity.timestamp.toLocaleDateString()} at {activity.timestamp.toLocaleTimeString()}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p className="no-activities">No recent activities</p>
+            )}
           </div>
         </div>
       </div>
