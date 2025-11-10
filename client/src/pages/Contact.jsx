@@ -424,7 +424,7 @@ const Contact = () => {
               Call Now: +266 57944278
             </a>
             <a
-              href="mailto:mokhothu@lesothocareerguide.co.ls"
+              href="mokhothuhalekhetheloe@gmail.com"
               className="inline-flex items-center px-6 py-3 bg-transparent border-2 border-white text-white rounded-lg font-semibold hover:bg-white hover:text-blue-600 transition-colors duration-200"
             >
               <Mail className="h-5 w-5 mr-2" />
