@@ -28,8 +28,8 @@ const AdminSettings = () => {
     // General Settings
     platformName: 'Lesotho CareerGuide',
     platformDescription: 'Empowering Basotho youth with education and career opportunities',
-    contactEmail: 'admin@lesothocareerguide.co.ls',
-    supportPhone: '+266 2231 3751',
+    contactEmail: 'mokhothuhalekhetheloe@gmail.com',
+    supportPhone: '+266 57944278',
     
     // Security Settings
     requireEmailVerification: true,
@@ -98,8 +98,8 @@ const AdminSettings = () => {
       const defaultSettings = {
         platformName: 'Lesotho CareerGuide',
         platformDescription: 'Empowering Basotho youth with education and career opportunities',
-        contactEmail: 'admin@lesothocareerguide.co.ls',
-        supportPhone: '+266 2231 3751',
+        contactEmail: 'mokhothuhalekhetheloe@gmail.com',
+        supportPhone: '+266 57944278',
         requireEmailVerification: true,
         requireAdminApproval: true,
         maxLoginAttempts: 5,

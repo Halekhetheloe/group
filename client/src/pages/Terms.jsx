@@ -320,8 +320,8 @@ const Terms = () => {
                 For questions about these Terms of Service, please contact us:
               </p>
               <div className="space-y-2 text-gray-700">
-                <p><strong>Email:</strong> info@lesothocareerguide.co.ls</p>
-                <p><strong>Phone:</strong> +266 2231 3751</p>
+                <p><strong>Email:</strong> mokhothuhalekhetheloe@gmail.com</p>
+                <p><strong>Phone:</strong> +266 57944278</p>
                 <p><strong>Address:</strong> Limkokwing University, Maseru, Lesotho</p>
                 <p><strong>Development Team:</strong> mokhothuhalekhetheloe@gmail.com</p>
               </div>

@@ -417,7 +417,7 @@ const Contact = () => {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a
-              href="tel:+26622313751"
+              href="tel:+266 57944278"
               className="inline-flex items-center px-6 py-3 bg-white text-blue-600 rounded-lg font-semibold hover:bg-gray-100 transition-colors duration-200"
             >
               <Phone className="h-5 w-5 mr-2" />
