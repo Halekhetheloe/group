@@ -1,0 +1,316 @@
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { 
+  Map, 
+  Home, 
+  GraduationCap, 
+  Building, 
+  Briefcase, 
+  User, 
+  FileText,
+  Shield,
+  Mail,
+  HelpCircle,
+  BookOpen,
+  Users,
+  Settings
+} from 'lucide-react';
+
+const Sitemap = () => {
+  const siteSections = [
+    {
+      title: 'Main Pages',
+      icon: Home,
+      color: 'blue',
+      pages: [
+        { name: 'Home', path: '/', description: 'Platform overview and landing page' },
+        { name: 'About Us', path: '/about', description: 'Learn about our mission and team' },
+        { name: 'Contact', path: '/contact', description: 'Get in touch with our support team' },
+      ]
+    },
+    {
+      title: 'Student Section',
+      icon: User,
+      color: 'green',
+      pages: [
+        { name: 'Student Dashboard', path: '/dashboard', description: 'Personal dashboard for students', loginRequired: true },
+        { name: 'Browse Courses', path: '/courses', description: 'Explore available courses and programs' },
+        { name: 'Course Details', path: '/course/:id', description: 'Detailed course information', dynamic: true },
+        { name: 'Browse Institutions', path: '/institutions', description: 'Find educational institutions' },
+        { name: 'Institution Profile', path: '/institution/:id', description: 'Institution details and programs', dynamic: true },
+        { name: 'Application Form', path: '/apply/:courseId', description: 'Submit course applications', dynamic: true, loginRequired: true },
+        { name: 'My Applications', path: '/my-applications', description: 'Track application status', loginRequired: true },
+        { name: 'Student Profile', path: '/profile', description: 'Manage personal information', loginRequired: true },
+        { name: 'Transcript Upload', path: '/upload-transcript', description: 'Upload academic transcripts', loginRequired: true },
+      ]
+    },
+    {
+      title: 'Career & Jobs',
+      icon: Briefcase,
+      color: 'purple',
+      pages: [
+        { name: 'Job Browser', path: '/jobs', description: 'Browse job opportunities' },
+        { name: 'Job Details', path: '/job/:id', description: 'Detailed job information', dynamic: true },
+        { name: 'Job Application', path: '/job-application/:id', description: 'Apply for jobs', dynamic: true, loginRequired: true },
+        { name: 'My Job Applications', path: '/my-job-applications', description: 'Track job applications', loginRequired: true },
+        { name: 'Career Counseling', path: '/career-counseling', description: 'Get career guidance' },
+      ]
+    },
+    {
+      title: 'Institution Portal',
+      icon: Building,
+      color: 'orange',
+      pages: [
+        { name: 'Institution Dashboard', path: '/institution/dashboard', description: 'Institution management portal', loginRequired: true, roleRequired: 'institution' },
+        { name: 'Course Management', path: '/institution/courses', description: 'Manage courses and programs', loginRequired: true, roleRequired: 'institution' },
+        { name: 'Admissions Management', path: '/institution/admissions', description: 'Process student applications', loginRequired: true, roleRequired: 'institution' },
+        { name: 'Student Management', path: '/institution/students', description: 'Manage enrolled students', loginRequired: true, roleRequired: 'institution' },
+        { name: 'Institution Profile', path: '/institution/profile', description: 'Manage institution information', loginRequired: true, roleRequired: 'institution' },
+        { name: 'Application Review', path: '/institution/application/:id', description: 'Review student applications', dynamic: true, loginRequired: true, roleRequired: 'institution' },
+      ]
+    },
+    {
+      title: 'Company Portal',
+      icon: Briefcase,
+      color: 'indigo',
+      pages: [
+        { name: 'Company Dashboard', path: '/company/dashboard', description: 'Company management portal', loginRequired: true, roleRequired: 'company' },
+        { name: 'Job Management', path: '/company/jobs', description: 'Create and manage job postings', loginRequired: true, roleRequired: 'company' },
+        { name: 'Applicant Management', path: '/company/applicants', description: 'Review job applicants', loginRequired: true, roleRequired: 'company' },
+        { name: 'Company Profile', path: '/company/profile', description: 'Manage company information', loginRequired: true, roleRequired: 'company' },
+        { name: 'Job Posting', path: '/company/job-posting', description: 'Create new job postings', loginRequired: true, roleRequired: 'company' },
+      ]
+    },
+    {
+      title: 'Admin Portal',
+      icon: Settings,
+      color: 'red',
+      pages: [
+        { name: 'Admin Dashboard', path: '/admin/dashboard', description: 'System administration portal', loginRequired: true, roleRequired: 'admin' },
+        { name: 'User Management', path: '/admin/users', description: 'Manage platform users', loginRequired: true, roleRequired: 'admin' },
+        { name: 'Institution Management', path: '/admin/institutions', description: 'Manage educational institutions', loginRequired: true, roleRequired: 'admin' },
+        { name: 'Company Management', path: '/admin/companies', description: 'Manage employer accounts', loginRequired: true, roleRequired: 'admin' },
+        { name: 'System Analytics', path: '/admin/analytics', description: 'Platform usage statistics', loginRequired: true, roleRequired: 'admin' },
+        { name: 'Reports', path: '/admin/reports', description: 'Generate system reports', loginRequired: true, roleRequired: 'admin' },
+      ]
+    },
+    {
+      title: 'Authentication',
+      icon: Shield,
+      color: 'gray',
+      pages: [
+        { name: 'Login', path: '/login', description: 'Sign in to your account' },
+        { name: 'Register', path: '/register', description: 'Create a new account' },
+        { name: 'Forgot Password', path: '/forgot-password', description: 'Reset your password' },
+        { name: 'Email Verification', path: '/verify-email', description: 'Verify your email address' },
+        { name: 'Pending Approval', path: '/pending-approval', description: 'Account approval status' },
+        { name: 'Suspended Account', path: '/suspended', description: 'Account suspension notice' },
+      ]
+    },
+    {
+      title: 'Legal & Support',
+      icon: FileText,
+      color: 'yellow',
+      pages: [
+        { name: 'Privacy Policy', path: '/privacy', description: 'Data protection and privacy information' },
+        { name: 'Terms of Service', path: '/terms', description: 'Platform terms and conditions' },
+        { name: 'FAQ', path: '/faq', description: 'Frequently asked questions' },
+        { name: 'Application Guide', path: '/guide/application', description: 'How to apply for courses' },
+        { name: 'Career Guide', path: '/guide/career', description: 'Career planning resources' },
+        { name: 'Scholarships', path: '/scholarships', description: 'Scholarship opportunities' },
+        { name: 'Partner with Us', path: '/institution/partner', description: 'Become a partner institution' },
+        { name: 'System Documentation', path: '/docs', description: 'Technical documentation' },
+      ]
+    }
+  ];
+
+  const getColorClasses = (color) => {
+    const colorMap = {
+      blue: 'bg-blue-100 text-blue-600',
+      green: 'bg-green-100 text-green-600',
+      purple: 'bg-purple-100 text-purple-600',
+      orange: 'bg-orange-100 text-orange-600',
+      indigo: 'bg-indigo-100 text-indigo-600',
+      red: 'bg-red-100 text-red-600',
+      gray: 'bg-gray-100 text-gray-600',
+      yellow: 'bg-yellow-100 text-yellow-600'
+    };
+    return colorMap[color] || 'bg-gray-100 text-gray-600';
+  };
+
+  const getBadgeColor = (type) => {
+    const colorMap = {
+      login: 'bg-purple-100 text-purple-800',
+      role: 'bg-orange-100 text-orange-800',
+      dynamic: 'bg-blue-100 text-blue-800'
+    };
+    return colorMap[type] || 'bg-gray-100 text-gray-800';
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 py-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Header */}
+        <div className="text-center mb-12">
+          <div className="flex justify-center mb-4">
+            <Map className="h-12 w-12 text-blue-600" />
+          </div>
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">
+            Site Map
+          </h1>
+          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+            Explore all the pages and features available on Lesotho CareerGuide platform. 
+            Find exactly what you're looking for with our comprehensive site navigation.
+          </p>
+        </div>
+
+        {/* Quick Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          {[
+            { count: siteSections.reduce((acc, section) => acc + section.pages.length, 0), label: 'Total Pages' },
+            { count: siteSections.find(s => s.title === 'Student Section')?.pages.length || 0, label: 'Student Pages' },
+            { count: siteSections.find(s => s.title === 'Institution Portal')?.pages.length || 0, label: 'Institution Pages' },
+            { count: siteSections.find(s => s.title === 'Public Pages')?.pages.length || 6, label: 'Public Pages' },
+          ].map((stat, index) => (
+            <div key={index} className="bg-white rounded-lg shadow-sm border p-4 text-center">
+              <div className="text-2xl font-bold text-blue-600">{stat.count}</div>
+              <div className="text-sm text-gray-600">{stat.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Legend */}
+        <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Access Legend</h3>
+          <div className="flex flex-wrap gap-4">
+            <div className="flex items-center space-x-2">
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getBadgeColor('login')}`}>
+                Login Required
+              </span>
+              <span className="text-sm text-gray-600">- Requires user authentication</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getBadgeColor('role')}`}>
+                Role Specific
+              </span>
+              <span className="text-sm text-gray-600">- Requires specific user role</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getBadgeColor('dynamic')}`}>
+                Dynamic Route
+              </span>
+              <span className="text-sm text-gray-600">- URL contains parameters</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Site Sections */}
+        <div className="space-y-8">
+          {siteSections.map((section, sectionIndex) => {
+            const Icon = section.icon;
+            return (
+              <div key={sectionIndex} className="bg-white rounded-lg shadow-sm border overflow-hidden">
+                {/* Section Header */}
+                <div className="bg-gray-50 px-6 py-4 border-b">
+                  <div className="flex items-center space-x-3">
+                    <div className={`p-2 rounded-lg ${getColorClasses(section.color)}`}>
+                      <Icon className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold text-gray-900">{section.title}</h2>
+                      <p className="text-gray-600 text-sm">
+                        {section.pages.length} pages in this section
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pages Grid */}
+                <div className="p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {section.pages.map((page, pageIndex) => (
+                      <div key={pageIndex} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow duration-200">
+                        <div className="flex justify-between items-start mb-2">
+                          <Link 
+                            to={page.path} 
+                            className="font-semibold text-blue-600 hover:text-blue-800 transition-colors duration-200"
+                          >
+                            {page.name}
+                          </Link>
+                          <div className="flex space-x-1">
+                            {page.loginRequired && (
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getBadgeColor('login')}`}>
+                                Login
+                              </span>
+                            )}
+                            {page.roleRequired && (
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getBadgeColor('role')}`}>
+                                {page.roleRequired}
+                              </span>
+                            )}
+                            {page.dynamic && (
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getBadgeColor('dynamic')}`}>
+                                Dynamic
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <p className="text-gray-600 text-sm mb-3">{page.description}</p>
+                        <div className="flex justify-between items-center">
+                          <code className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                            {page.path}
+                          </code>
+                          <Link 
+                            to={page.path}
+                            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                          >
+                            Visit →
+                          </Link>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Help Section */}
+        <div className="mt-12 bg-blue-50 rounded-lg p-6">
+          <div className="text-center">
+            <HelpCircle className="h-12 w-12 text-blue-600 mx-auto mb-4" />
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Need Help Navigating?</h3>
+            <p className="text-gray-600 mb-4">
+              Can't find what you're looking for? Our support team is here to help.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link 
+                to="/contact" 
+                className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors duration-200"
+              >
+                <Mail className="h-4 w-4 mr-2" />
+                Contact Support
+              </Link>
+              <Link 
+                to="/faq" 
+                className="inline-flex items-center px-6 py-3 bg-white text-blue-600 border border-blue-600 rounded-lg font-semibold hover:bg-blue-50 transition-colors duration-200"
+              >
+                <HelpCircle className="h-4 w-4 mr-2" />
+                View FAQ
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* Last Updated */}
+        <div className="mt-8 text-center text-gray-500 text-sm">
+          <p>Site map last updated: {new Date().toLocaleDateString()}</p>
+          <p className="mt-1">Platform Version: 1.0.0</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Sitemap;

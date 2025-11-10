@@ -38,8 +38,8 @@ const Footer = () => {
 
   const developmentTeam = [
     { 
-      name: 'Mokhothu Halekhetheloe', 
-      email: 'mokhothuhalekhetheloe@gmail.com',
+      name: 'Thomonyane Neo', 
+      email: 'thomonyaneneo@gmail.com',
       role: 'Lead Developer'
     },
     { 
@@ -53,7 +53,8 @@ const Footer = () => {
       role: 'Support'
     },
     { 
-      name: 'Admin Access', 
+      name: 'Mokhothu Halekhetheloe', 
+      email: 'mokhothuhalekhetheloe@gmail.com',
       credential: 'ID: 5123456',
       role: 'System Admin'
     }
@@ -139,12 +140,12 @@ const Footer = () => {
               </div>
               <div className="flex items-center space-x-3">
                 <Phone className="h-4 w-4 text-blue-400" />
-                <span className="text-sm text-gray-300">+266 2231 3751</span>
+                <span className="text-sm text-gray-300">+266 56956364</span>
               </div>
               <div className="flex items-center space-x-3">
                 <Mail className="h-4 w-4 text-blue-400" />
                 <span className="text-sm text-gray-300">
-                  info@lesothocareerguide.co.ls
+                  thomonyaneneo@gmail.com
                 </span>
               </div>
             </div>
@@ -214,6 +215,9 @@ const Footer = () => {
               <Link to="/sitemap" className="hover:text-blue-400 transition-colors">
                 Sitemap
               </Link>
+              <Link to="/faq" className="hover:text-blue-400 transition-colors">
+                FAQ
+              </Link>
             </div>
 
             <div className="flex items-center space-x-1 text-sm text-gray-400">
@@ -241,7 +245,7 @@ const Footer = () => {
             <p className="text-xs text-gray-400 text-center">
               🔒 <strong>Secure Access:</strong> This platform is protected. Contact development team for authorized access.
               <br />
-              <span className="text-yellow-400">Authorized Emails: mokhothuhalekhetheloe@gmail.com | nthethesekete280@gmail.com</span>
+              <span className="text-yellow-400">Authorized Emails: mokhothuhalekhetheloe@gmail.com | nthethesekete280@gmail.com | thomonyaneneo@gmail.com</span>
             </p>
           </div>
         </div>

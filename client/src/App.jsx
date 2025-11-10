@@ -24,6 +24,8 @@ import About from './pages/About'
 import Contact from './pages/Contact'
 import Privacy from './pages/Privacy'
 import Terms from './pages/Terms'
+import Sitemap from './pages/Sitemap'
+import FAQ from './pages/FAQ'
 
 // Dashboard Redirect
 import DashboardRedirect from './components/shared/DashboardRedirect'
@@ -115,6 +117,8 @@ function App() {
                 <Route path="/institutions" element={<Institutions />} />
                 <Route path="/about" element={<About />} />
                 <Route path="/contact" element={<Contact />} />
+                <Route path="/sitemap" element={<Sitemap />} />
+                <Route path="/faq" element={<FAQ />} />
                 
                 {/* Auth Routes */}
                 <Route path="/login" element={<Login />} />
