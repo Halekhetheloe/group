@@ -27,8 +27,9 @@ import Terms from './pages/Terms'
 import Sitemap from './pages/Sitemap'
 import FAQ from './pages/FAQ'
 
-// Dashboard Redirect
+// Dashboard & Profile Redirects
 import DashboardRedirect from './components/shared/DashboardRedirect'
+import ProfileRedirect from './components/shared/ProfileRedirect'
 
 // Student Pages
 import StudentDashboard from './components/student/StudentDashboard'
@@ -65,13 +66,17 @@ import InstitutionManagement from './components/admin/InstitutionManagement'
 import CompanyManagement from './components/admin/CompanyManagement'
 import Reports from './components/admin/Reports'
 import SystemAnalytics from './components/admin/SystemAnalytics'
+import AdminCourseManagement from './components/admin/CourseManagement'
+import AdminSettings from './components/admin/AdminSettings'
+import AdminApplications from './components/admin/AdminApplications'
+import AdminProfile from './components/admin/AdminProfile'
 
 // Job Application Component
 import JobApplication from './components/student/JobApplication'
 
 // Styles
 import './styles/index.css'
-import './styles/App.css' 
+import './styles/App.css'
 
 function App() {
   return (
@@ -119,15 +124,15 @@ function App() {
                 <Route path="/contact" element={<Contact />} />
                 <Route path="/sitemap" element={<Sitemap />} />
                 <Route path="/faq" element={<FAQ />} />
-                
+                <Route path="/privacy" element={<Privacy />} />
+                <Route path="/terms" element={<Terms />} />
+
                 {/* Auth Routes */}
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
                 <Route path="/verify-email" element={<EmailVerification />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/pending-approval" element={<PendingApprovalRoute />} />
-                <Route path="/privacy" element={<Privacy />} />
-                <Route path="/terms" element={<Terms />} />
 
                 {/* Main Dashboard Route */}
                 <Route
@@ -136,6 +141,18 @@ function App() {
                     <ProtectedRoute allowedRoles={['student', 'institution', 'company', 'admin']}>
                       <Layout>
                         <DashboardRedirect />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
+
+                {/* Profile Route */}
+                <Route
+                  path="/profile"
+                  element={
+                    <ProtectedRoute allowedRoles={['student', 'institution', 'company', 'admin']}>
+                      <Layout>
+                        <ProfileRedirect />
                       </Layout>
                     </ProtectedRoute>
                   }
@@ -391,6 +408,26 @@ function App() {
                   }
                 />
                 <Route
+                  path="/admin/applications"
+                  element={
+                    <ProtectedRoute allowedRoles={['admin']}>
+                      <Layout>
+                        <AdminApplications />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/settings"
+                  element={
+                    <ProtectedRoute allowedRoles={['admin']}>
+                      <Layout>
+                        <AdminSettings />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
                   path="/admin/users"
                   element={
                     <ProtectedRoute allowedRoles={['admin']}>
@@ -406,6 +443,16 @@ function App() {
                     <ProtectedRoute allowedRoles={['admin']}>
                       <Layout>
                         <InstitutionManagement />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/courses"
+                  element={
+                    <ProtectedRoute allowedRoles={['admin']}>
+                      <Layout>
+                        <AdminCourseManagement />
                       </Layout>
                     </ProtectedRoute>
                   }
@@ -436,6 +483,16 @@ function App() {
                     <ProtectedRoute allowedRoles={['admin']}>
                       <Layout>
                         <SystemAnalytics />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/profile"
+                  element={
+                    <ProtectedRoute allowedRoles={['admin']}>
+                      <Layout>
+                        <AdminProfile />
                       </Layout>
                     </ProtectedRoute>
                   }

@@ -51,13 +51,7 @@ const AdminDashboard = () => {
         pendingCompanies: companies.filter(comp => comp.status === 'pending').length
       })
 
-      // Mock recent activities (in real app, you'd fetch from an activities collection)
-      setRecentActivities([
-        { id: 1, type: 'user_registered', message: 'New student registered: John Doe', timestamp: new Date(), user: 'John Doe' },
-        { id: 2, type: 'institution_pending', message: 'New institution awaiting approval: LIMKOKWING', timestamp: new Date(), user: 'LIMKOKWING' },
-        { id: 3, type: 'application_submitted', message: 'New course application submitted', timestamp: new Date(), user: 'Jane Smith' },
-        { id: 4, type: 'company_approved', message: 'Company approved: Tech Solutions Ltd', timestamp: new Date(), user: 'Tech Solutions Ltd' }
-      ])
+      
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error)
