@@ -16,17 +16,17 @@ import PendingApproval from './components/auth/PendingApproval'
 
 // Public Pages
 import Landing from './pages/Landing'
-import Home from './pages/Home'
-import Courses from './pages/Courses'
-import Jobs from './pages/Jobs'
-import Institutions from './pages/Institutions'
-import About from './pages/About'
-import Contact from './pages/Contact'
-import Privacy from './pages/Privacy'
-import Terms from './pages/Terms'
-import Sitemap from './pages/Sitemap'
-import FAQ from './pages/FAQ'
-import Notifications from './pages/Notifications'
+import Home from '/pages/Home'
+import Courses from '/pages/Courses'
+import Jobs from '/pages/Jobs'
+import Institutions from '/pages/Institutions'
+import About from '/pages/About'
+import Contact from '/pages/Contact'
+import Privacy from '/pages/Privacy'
+import Terms from '/pages/Terms'
+import Sitemap from '/pages/Sitemap'
+import FAQ from '/pages/FAQ'
+import Notifications from '/pages/Notifications'
 
 // Dashboard & Profile Redirects
 import DashboardRedirect from './components/shared/DashboardRedirect'
@@ -36,7 +36,7 @@ import ProfileRedirect from './components/shared/ProfileRedirect'
 import StudentDashboard from './components/student/StudentDashboard'
 import CourseBrowser from './components/student/CourseBrowser'
 import ApplicationForm from './components/student/ApplicationForm'
-import MyApplications from './components/student/MyApplications' // ✅ This import exists
+import MyApplications from './components/student/MyApplications'
 import AdmissionsResults from './components/student/AdmissionsResults'
 import TranscriptUpload from './components/student/TranscriptUpload'
 import JobBrowser from './components/student/JobBrowser'
@@ -225,9 +225,9 @@ function App() {
                     </ProtectedRoute>
                   }
                 />
-                {/* FIXED: This route should work now */}
+                {/* CHANGED: Updated route from /student/my-applications to /student/applications */}
                 <Route
-                  path="/student/my-applications"
+                  path="/student/applications"
                   element={
                     <ProtectedRoute allowedRoles={['student']}>
                       <Layout>
