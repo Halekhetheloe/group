@@ -3,6 +3,9 @@ import { collection, query, where, getDocs, doc, getDoc, orderBy } from 'firebas
 import { db } from '../../firebase-config'
 import { useAuth } from '../../hooks/useAuth'
 
+// Debug: Check if component is loading
+console.log('🎯 MyApplications component is loading...')
+
 const MyApplications = () => {
   const { userData } = useAuth()
   const [applications, setApplications] = useState([])
@@ -12,19 +15,24 @@ const MyApplications = () => {
   const [statusFilter, setStatusFilter] = useState('all')
   const [typeFilter, setTypeFilter] = useState('all')
 
+  console.log('🎯 MyApplications component is rendering for user:', userData?.uid)
+
   useEffect(() => {
+    console.log('🔍 useEffect triggered, userData:', userData)
     if (userData) {
       fetchApplications()
     }
   }, [userData])
 
   useEffect(() => {
+    console.log('🔍 Filter useEffect triggered')
     filterApplications()
   }, [applications, searchTerm, statusFilter, typeFilter])
 
   const fetchApplications = async () => {
     try {
       setLoading(true)
+      console.log('📡 Starting to fetch applications...')
       
       // Fetch student's applications
       const applicationsQuery = query(
@@ -38,7 +46,7 @@ const MyApplications = () => {
         ...doc.data()
       }))
 
-      console.log('Raw applications:', applicationsData) // Debug log
+      console.log('📄 Raw applications found:', applicationsData)
 
       // Fetch details for each application based on type
       const applicationsWithDetails = await Promise.all(
@@ -117,16 +125,25 @@ const MyApplications = () => {
         })
       )
 
+      console.log('✅ Applications with details:', applicationsWithDetails)
       setApplications(applicationsWithDetails)
     } catch (error) {
-      console.error('Error fetching applications:', error)
+      console.error('❌ Error fetching applications:', error)
     } finally {
       setLoading(false)
+      console.log('🏁 Fetch applications completed')
     }
   }
 
   const filterApplications = () => {
     let filtered = applications
+
+    console.log('🔍 Filtering applications:', {
+      total: applications.length,
+      searchTerm,
+      statusFilter,
+      typeFilter
+    })
 
     // Search filter
     if (searchTerm) {
@@ -149,6 +166,7 @@ const MyApplications = () => {
       filtered = filtered.filter(app => app.applicationType === typeFilter)
     }
 
+    console.log('✅ Filtered applications count:', filtered.length)
     setFilteredApplications(filtered)
   }
 
@@ -225,6 +243,7 @@ const MyApplications = () => {
   }
 
   if (loading) {
+    console.log('⏳ Showing loading state...')
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
         <div className="max-w-7xl mx-auto">
@@ -242,9 +261,17 @@ const MyApplications = () => {
     )
   }
 
+  console.log('🎨 Rendering main component with', filteredApplications.length, 'applications')
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
       <div className="max-w-7xl mx-auto">
+        {/* Debug Banner */}
+        <div className="mb-4 p-4 bg-green-100 border border-green-300 rounded-lg">
+          <p className="text-green-800 font-medium">✅ MyApplications component is working!</p>
+          <p className="text-green-700 text-sm">User: {userData?.uid} | Applications: {applications.length}</p>
+        </div>
+
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-slate-800">My Applications</h1>

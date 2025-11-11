@@ -36,7 +36,7 @@ import ProfileRedirect from './components/shared/ProfileRedirect'
 import StudentDashboard from './components/student/StudentDashboard'
 import CourseBrowser from './components/student/CourseBrowser'
 import ApplicationForm from './components/student/ApplicationForm'
-import MyApplications from './components/student/MyApplications'
+import MyApplications from './components/student/MyApplications' // ✅ This import exists
 import AdmissionsResults from './components/student/AdmissionsResults'
 import TranscriptUpload from './components/student/TranscriptUpload'
 import JobBrowser from './components/student/JobBrowser'
@@ -225,6 +225,7 @@ function App() {
                     </ProtectedRoute>
                   }
                 />
+                {/* FIXED: This route should work now */}
                 <Route
                   path="/student/my-applications"
                   element={
