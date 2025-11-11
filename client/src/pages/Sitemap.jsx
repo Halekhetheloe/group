@@ -1,7 +1,35 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext'; // Adjust path as needed
 
 const Sitemap = () => {
+  const { userData } = useAuth();
+
+  // Check if user is admin
+  if (!userData || userData.role !== 'admin') {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12">
+        <div className="max-w-md w-full text-center">
+          <div className="bg-white rounded-lg shadow-md p-8">
+            <div className="h-16 w-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="text-red-600 text-2xl">⛔</span>
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">Access Denied</h1>
+            <p className="text-gray-600 mb-6">
+              The sitemap is only accessible to administrators.
+            </p>
+            <Link
+              to="/"
+              className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors duration-200"
+            >
+              Return to Home
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const siteSections = [
     {
       title: 'Main Pages',
@@ -124,6 +152,39 @@ const Sitemap = () => {
     return colorMap[type] || 'bg-gray-100 text-gray-800';
   };
 
+  // Function to check if route exists and is accessible
+  const canNavigateTo = (page) => {
+    // For dynamic routes, check if base route exists
+    if (page.dynamic) {
+      const basePath = page.path.split('/:')[0];
+      return basePath !== '/course' && basePath !== '/institution' && basePath !== '/job';
+    }
+    
+    // For static routes, check if they exist in our app
+    const existingRoutes = [
+      '/', '/about', '/contact', '/privacy', '/terms', '/sitemap', '/faq',
+      '/login', '/register', '/verify-email', '/forgot-password', '/pending-approval',
+      '/dashboard', '/profile', '/courses', '/jobs', '/institutions', '/notifications',
+      // Student routes
+      '/student/dashboard', '/student/courses', '/student/applications', 
+      '/student/admissions', '/student/transcripts', '/student/jobs',
+      '/student/job-applications', '/student/profile',
+      // Institution routes
+      '/institution/dashboard', '/institution/faculties', '/institution/courses',
+      '/institution/applications', '/institution/admissions', '/institution/students',
+      '/institution/profile',
+      // Company routes
+      '/company/dashboard', '/company/post-job', '/company/jobs',
+      '/company/applicants', '/company/profile',
+      // Admin routes
+      '/admin/dashboard', '/admin/applications', '/admin/settings', '/admin/users',
+      '/admin/institutions', '/admin/courses', '/admin/companies', '/admin/reports',
+      '/admin/analytics', '/admin/profile'
+    ];
+    
+    return existingRoutes.includes(page.path);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -205,39 +266,54 @@ const Sitemap = () => {
               {/* Pages Grid */}
               <div className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {section.pages.map((page, pageIndex) => (
-                    <div key={pageIndex} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow duration-200">
-                      <div className="flex justify-between items-start mb-2">
-                        <h3 className="font-semibold text-gray-900">
-                          {page.name}
-                        </h3>
-                        <div className="flex space-x-1">
-                          {page.loginRequired && (
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getBadgeColor('login')}`}>
-                              Login
-                            </span>
+                  {section.pages.map((page, pageIndex) => {
+                    const isClickable = canNavigateTo(page);
+                    
+                    return (
+                      <div key={pageIndex} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow duration-200">
+                        <div className="flex justify-between items-start mb-2">
+                          {isClickable ? (
+                            <Link 
+                              to={page.path}
+                              className="font-semibold text-blue-600 hover:text-blue-800 transition-colors duration-200"
+                            >
+                              {page.name}
+                            </Link>
+                          ) : (
+                            <h3 className="font-semibold text-gray-900">
+                              {page.name}
+                            </h3>
                           )}
-                          {page.roleRequired && (
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getBadgeColor('role')}`}>
-                              {page.roleRequired}
-                            </span>
-                          )}
-                          {page.dynamic && (
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getBadgeColor('dynamic')}`}>
-                              Dynamic
-                            </span>
+                          <div className="flex space-x-1">
+                            {page.loginRequired && (
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getBadgeColor('login')}`}>
+                                Login
+                              </span>
+                            )}
+                            {page.roleRequired && (
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getBadgeColor('role')}`}>
+                                {page.roleRequired}
+                              </span>
+                            )}
+                            {page.dynamic && (
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getBadgeColor('dynamic')}`}>
+                                Dynamic
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <p className="text-gray-600 text-sm mb-3">{page.description}</p>
+                        <div className="flex justify-between items-center">
+                          <code className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                            {page.path}
+                          </code>
+                          {!isClickable && (
+                            <span className="text-xs text-gray-400">Coming Soon</span>
                           )}
                         </div>
                       </div>
-                      <p className="text-gray-600 text-sm mb-3">{page.description}</p>
-                      <div className="flex justify-between items-center">
-                        <code className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                          {page.path}
-                        </code>
-                        {/* Removed Visit button - only showing path */}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>

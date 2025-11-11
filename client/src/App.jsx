@@ -123,20 +123,33 @@ function App() {
                 <Route path="/institutions" element={<Institutions />} />
                 <Route path="/about" element={<About />} />
                 <Route path="/contact" element={<Contact />} />
-                <Route path="/sitemap" element={<Sitemap />} />
                 <Route path="/faq" element={<FAQ />} />
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/terms" element={<Terms />} />
+
+                {/* Admin-only Sitemap Route */}
                 <Route
-  path="/notifications"
-  element={
-    <ProtectedRoute allowedRoles={['student', 'institution', 'company', 'admin']}>
-      <Layout>
-        <Notifications />
-      </Layout>
-    </ProtectedRoute>
-  }
-/>
+                  path="/sitemap"
+                  element={
+                    <ProtectedRoute allowedRoles={['admin']}>
+                      <Layout>
+                        <Sitemap />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
+
+                {/* Notifications Route */}
+                <Route
+                  path="/notifications"
+                  element={
+                    <ProtectedRoute allowedRoles={['student', 'institution', 'company', 'admin']}>
+                      <Layout>
+                        <Notifications />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
 
                 {/* Auth Routes */}
                 <Route path="/login" element={<Login />} />
