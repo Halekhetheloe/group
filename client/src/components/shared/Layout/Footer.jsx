@@ -155,8 +155,8 @@ const Footer = () => {
         </div>
       )}
 
-      {/* Main Footer */}
-      <footer className="bg-gray-900 text-white">
+      {/* Main Footer - Now stretches to fill space */}
+      <footer className="bg-gray-900 text-white mt-auto">
         {/* Main Footer Content */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
@@ -296,7 +296,6 @@ const Footer = () => {
                 <Link to="/terms" className="hover:text-blue-400 transition-colors">
                   Terms of Service
                 </Link>
-                {/* REMOVED: Sitemap link from footer */}
                 <Link to="/faq" className="hover:text-blue-400 transition-colors">
                   FAQ
                 </Link>
@@ -312,7 +311,7 @@ const Footer = () => {
             {/* Academic Credit */}
             <div className="mt-4 text-center md:text-left">
               <p className="text-xs text-gray-500">
-                Developed by Limkokwing students (Nthethe Sekete,Halekhetheloe Mokhothu and Neo Thomonyane ) from the Faculty of Information & Communication Technology
+                Developed by Limkokwing students (Nthethe Sekete, Halekhetheloe Mokhothu and Neo Thomonyane) from the Faculty of Information & Communication Technology
               </p>
               <p className="text-xs text-gray-500 mt-1">
                 BSc. in Information Technology 
