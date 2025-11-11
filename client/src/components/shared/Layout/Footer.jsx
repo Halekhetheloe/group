@@ -296,9 +296,7 @@ const Footer = () => {
                 <Link to="/terms" className="hover:text-blue-400 transition-colors">
                   Terms of Service
                 </Link>
-                <Link to="/sitemap" className="hover:text-blue-400 transition-colors">
-                  Sitemap
-                </Link>
+                {/* REMOVED: Sitemap link from footer */}
                 <Link to="/faq" className="hover:text-blue-400 transition-colors">
                   FAQ
                 </Link>
@@ -314,10 +312,10 @@ const Footer = () => {
             {/* Academic Credit */}
             <div className="mt-4 text-center md:text-left">
               <p className="text-xs text-gray-500">
-                Developed for Limkokwing University - Faculty of Information & Communication Technology
+                Developed by Limkokwing students (Nthethe Sekete,Halekhetheloe Mokhothu and Neo Thomonyane ) from the Faculty of Information & Communication Technology
               </p>
               <p className="text-xs text-gray-500 mt-1">
-                BSc. in Information Technology | BSc. in Business Information Technology | Diploma in IT
+                BSc. in Information Technology 
               </p>
               <p className="text-xs text-gray-400 mt-2 font-medium">
                 System Credentials Available for Authorized Personnel
@@ -327,7 +325,7 @@ const Footer = () => {
             {/* Security Notice */}
             <div className="mt-3 p-3 bg-gray-800 rounded-lg">
               <p className="text-xs text-gray-400 text-center">
-                🔒 <strong>Secure Access:</strong> This platform is protected. Contact development team for authorized access.
+                 <strong>Secure Access:</strong> This platform is protected. Contact development team for authorized access.
                 <br />
                 <span className="text-yellow-400">Authorized Emails: mokhothuhalekhetheloe@gmail.com | nthethesekete280@gmail.com | thomonyaneneo@gmail.com</span>
               </p>

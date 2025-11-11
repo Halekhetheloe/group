@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore'
 import { db } from '../../firebase-config'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 
 const AdminDashboard = () => {
   const [stats, setStats] = useState({
@@ -177,6 +177,73 @@ const AdminDashboard = () => {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
           <p className="text-gray-600">Welcome to the Career Guidance Platform administration panel</p>
+        </div>
+
+        {/* Quick Actions Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {/* Sitemap Card */}
+          <Link 
+            to="/sitemap" 
+            className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:shadow-lg transition-all duration-200 hover:scale-105"
+          >
+            <div className="flex items-center space-x-4">
+              <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                <span className="text-blue-600 text-xl"></span>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Site Map</h3>
+                <p className="text-sm text-gray-600">View all platform routes</p>
+              </div>
+            </div>
+          </Link>
+
+          {/* User Management Card */}
+          <Link 
+            to="/admin/users" 
+            className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:shadow-lg transition-all duration-200 hover:scale-105"
+          >
+            <div className="flex items-center space-x-4">
+              <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center">
+                <span className="text-green-600 text-xl">👥</span>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">User Management</h3>
+                <p className="text-sm text-gray-600">Manage all users</p>
+              </div>
+            </div>
+          </Link>
+
+          {/* Institution Management Card */}
+          <Link 
+            to="/admin/institutions" 
+            className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:shadow-lg transition-all duration-200 hover:scale-105"
+          >
+            <div className="flex items-center space-x-4">
+              <div className="h-12 w-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                <span className="text-orange-600 text-xl">🏫</span>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Institutions</h3>
+                <p className="text-sm text-gray-600">Manage institutions</p>
+              </div>
+            </div>
+          </Link>
+
+          {/* Company Management Card */}
+          <Link 
+            to="/admin/companies" 
+            className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:shadow-lg transition-all duration-200 hover:scale-105"
+          >
+            <div className="flex items-center space-x-4">
+              <div className="h-12 w-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                <span className="text-purple-600 text-xl">💼</span>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Companies</h3>
+                <p className="text-sm text-gray-600">Manage companies</p>
+              </div>
+            </div>
+          </Link>
         </div>
 
         {/* Stats Grid */}
