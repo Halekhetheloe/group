@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { doc, getDoc, addDoc, collection, query, where, getDocs } from 'firebase/firestore'
-import { db, storage } from '../../firebase-config'
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
+import { db } from '../../firebase-config'
 import { useAuth } from '../../hooks/useAuth'
-import { ArrowLeft, Upload, FileText, X, CheckCircle, AlertCircle } from 'lucide-react'
+import { ArrowLeft, CheckCircle, AlertCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const ApplicationForm = () => {
@@ -16,11 +15,9 @@ const ApplicationForm = () => {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [formData, setFormData] = useState({
-    personalStatement: '',
-    documents: []
+    personalStatement: ''
   })
   const [errors, setErrors] = useState({})
-  const [uploading, setUploading] = useState(false)
   const [hasApplied, setHasApplied] = useState(false)
   const [applicationLimit, setApplicationLimit] = useState(false)
 
@@ -90,81 +87,8 @@ const ApplicationForm = () => {
       newErrors.personalStatement = 'Personal statement should be at least 100 characters'
     }
     
-    if (formData.documents.length === 0) {
-      newErrors.documents = 'At least one document is required'
-    }
-    
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
-  }
-
-  const handleFileUpload = async (file) => {
-    if (!file) return null
-
-    // Validate file type and size
-    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
-    const maxSize = 5 * 1024 * 1024 // 5MB
-
-    if (!allowedTypes.includes(file.type)) {
-      toast.error('Please upload PDF, Word, or image files only')
-      return null
-    }
-
-    if (file.size > maxSize) {
-      toast.error('File size must be less than 5MB')
-      return null
-    }
-
-    try {
-      setUploading(true)
-      
-      // Create a unique file name
-      const fileExtension = file.name.split('.').pop()
-      const fileName = `applications/${userData.uid}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExtension}`
-      
-      // Upload file to Firebase Storage
-      const storageRef = ref(storage, fileName)
-      const snapshot = await uploadBytes(storageRef, file)
-      const downloadURL = await getDownloadURL(snapshot.ref)
-      
-      return {
-        name: file.name,
-        type: file.type,
-        size: file.size,
-        url: downloadURL,
-        uploadedAt: new Date()
-      }
-    } catch (error) {
-      console.error('Error uploading file:', error)
-      toast.error('Failed to upload file')
-      return null
-    } finally {
-      setUploading(false)
-    }
-  }
-
-  const handleFileChange = async (e) => {
-    const files = Array.from(e.target.files)
-    
-    for (const file of files) {
-      const uploadedFile = await handleFileUpload(file)
-      if (uploadedFile) {
-        setFormData(prev => ({
-          ...prev,
-          documents: [...prev.documents, uploadedFile]
-        }))
-      }
-    }
-    
-    // Clear file input
-    e.target.value = ''
-  }
-
-  const removeDocument = (index) => {
-    setFormData(prev => ({
-      ...prev,
-      documents: prev.documents.filter((_, i) => i !== index)
-    }))
   }
 
   const handleSubmit = async (e) => {
@@ -190,7 +114,6 @@ const ApplicationForm = () => {
         courseId: courseId,
         institutionId: course.institutionId,
         personalStatement: formData.personalStatement.trim(),
-        documents: formData.documents,
         status: 'pending',
         appliedAt: new Date(),
         // Student profile information
@@ -208,21 +131,6 @@ const ApplicationForm = () => {
     } finally {
       setSubmitting(false)
     }
-  }
-
-  const formatFileSize = (bytes) => {
-    if (bytes === 0) return '0 Bytes'
-    const k = 1024
-    const sizes = ['Bytes', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-  }
-
-  const getFileIcon = (fileType) => {
-    if (fileType.includes('pdf')) return '📄'
-    if (fileType.includes('word') || fileType.includes('document')) return '📝'
-    if (fileType.includes('image')) return '🖼️'
-    return '📎'
   }
 
   if (loading) {
@@ -401,107 +309,6 @@ const ApplicationForm = () => {
                 </span>
               </div>
             </div>
-          </div>
-
-          {/* Document Upload */}
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 transition-all duration-300 hover:shadow-xl">
-            <h2 className="text-xl font-bold text-gray-900 mb-6 pb-3 border-b border-gray-200">Supporting Documents</h2>
-            
-            {/* File Upload Area */}
-            <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-blue-400 transition-all duration-300 bg-gray-50 hover:bg-blue-50">
-              <input
-                type="file"
-                id="documents"
-                multiple
-                onChange={handleFileChange}
-                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                className="hidden"
-              />
-              <label htmlFor="documents" className="cursor-pointer block">
-                <Upload className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                <p className="text-xl font-semibold text-gray-900 mb-3">
-                  Upload supporting documents
-                </p>
-                <p className="text-gray-600 mb-6 max-w-md mx-auto">
-                  Upload your transcripts, certificates, ID, and other required documents
-                </p>
-                <button
-                  type="button"
-                  className={`bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center mx-auto ${
-                    uploading ? 'opacity-50 cursor-not-allowed' : ''
-                  }`}
-                  disabled={uploading}
-                >
-                  <Upload className="h-5 w-5 mr-2" />
-                  {uploading ? 'Uploading...' : 'Choose Files'}
-                </button>
-              </label>
-              <p className="text-sm text-gray-500 mt-6">
-                Supported formats: PDF, Word, JPG, PNG (Max 5MB per file)
-              </p>
-            </div>
-
-            {errors.documents && (
-              <p className="text-red-600 font-medium mt-4 flex items-center">
-                <AlertCircle className="h-4 w-4 mr-2" />
-                {errors.documents}
-              </p>
-            )}
-
-            {/* Uploaded Files List */}
-            {formData.documents.length > 0 && (
-              <div className="mt-8">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Uploaded Documents ({formData.documents.length})</h3>
-                <div className="space-y-3">
-                  {formData.documents.map((doc, index) => (
-                    <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200 hover:bg-blue-50 transition-all duration-300">
-                      <div className="flex items-center space-x-4">
-                        <span className="text-2xl">{getFileIcon(doc.type)}</span>
-                        <div>
-                          <p className="font-semibold text-gray-900">{doc.name}</p>
-                          <p className="text-sm text-gray-600">
-                            {formatFileSize(doc.size)} • {doc.type.split('/')[1]?.toUpperCase()}
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => removeDocument(index)}
-                        className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all duration-300 transform hover:scale-110"
-                      >
-                        <X className="h-5 w-5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Required Documents Info */}
-          <div className="bg-blue-50 rounded-2xl border-2 border-blue-200 p-6 transition-all duration-300 hover:shadow-lg">
-            <h3 className="text-lg font-bold text-blue-900 mb-4 flex items-center">
-              <FileText className="h-5 w-5 mr-2" />
-              Required Documents
-            </h3>
-            <ul className="space-y-3 text-blue-800">
-              <li className="flex items-center bg-blue-100 rounded-lg p-3">
-                <FileText className="h-4 w-4 mr-3 text-blue-600" />
-                Academic transcripts and certificates
-              </li>
-              <li className="flex items-center bg-blue-100 rounded-lg p-3">
-                <FileText className="h-4 w-4 mr-3 text-blue-600" />
-                National ID or passport copy
-              </li>
-              <li className="flex items-center bg-blue-100 rounded-lg p-3">
-                <FileText className="h-4 w-4 mr-3 text-blue-600" />
-                Recent passport-sized photograph
-              </li>
-              <li className="flex items-center bg-blue-100 rounded-lg p-3">
-                <FileText className="h-4 w-4 mr-3 text-blue-600" />
-                Any other supporting documents
-              </li>
-            </ul>
           </div>
 
           {/* Submit Button */}
