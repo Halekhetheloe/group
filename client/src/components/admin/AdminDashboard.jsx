@@ -204,7 +204,7 @@ const AdminDashboard = () => {
           >
             <div className="flex items-center space-x-4">
               <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <span className="text-green-600 text-xl">👥</span>
+                <span className="text-green-600 text-xl"></span>
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">User Management</h3>
@@ -220,7 +220,7 @@ const AdminDashboard = () => {
           >
             <div className="flex items-center space-x-4">
               <div className="h-12 w-12 bg-orange-100 rounded-lg flex items-center justify-center">
-                <span className="text-orange-600 text-xl">🏫</span>
+                <span className="text-orange-600 text-xl"></span>
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">Institutions</h3>
@@ -236,7 +236,7 @@ const AdminDashboard = () => {
           >
             <div className="flex items-center space-x-4">
               <div className="h-12 w-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <span className="text-purple-600 text-xl">💼</span>
+                <span className="text-purple-600 text-xl"></span>
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">Companies</h3>
