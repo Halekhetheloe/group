@@ -227,7 +227,7 @@ function App() {
                 />
                 {/* CHANGED: Updated route from /student/my-applications to /student/applications */}
                 <Route
-                  path="/student/applications"
+                  path="/student/MyApplications"
                   element={
                     <ProtectedRoute allowedRoles={['student']}>
                       <Layout>
