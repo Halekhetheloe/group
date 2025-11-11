@@ -1,11 +1,12 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext'; // Adjust path as needed
+// Import path fixed - adjust if needed based on your structure
+import { useAuth } from '../context/AuthContext';
 
 const Sitemap = () => {
   const { userData } = useAuth();
 
-  // Check if user is admin
+  // Admin check - uncomment when you confirm the import path works
   if (!userData || userData.role !== 'admin') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12">
