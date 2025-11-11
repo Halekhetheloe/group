@@ -226,7 +226,7 @@ function App() {
                   }
                 />
                 <Route
-                  path="/student/applications"
+                  path="/student/my-applications"
                   element={
                     <ProtectedRoute allowedRoles={['student']}>
                       <Layout>
