@@ -13,6 +13,7 @@ const Navbar = () => {
   const location = useLocation()
   const navigate = useNavigate()
   const userMenuRef = useRef(null)
+  const notificationsRef = useRef(null)
 
   const isActive = (path) => location.pathname === path
 
@@ -22,7 +23,7 @@ const Navbar = () => {
       if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
         setShowUserMenu(false)
       }
-      if (showNotifications && !event.target.closest('.notifications-container')) {
+      if (notificationsRef.current && !notificationsRef.current.contains(event.target)) {
         setShowNotifications(false)
       }
     }
@@ -31,7 +32,7 @@ const Navbar = () => {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [showNotifications])
+  }, [showNotifications, showUserMenu])
 
   const handleLogout = async () => {
     try {
@@ -140,7 +141,7 @@ const Navbar = () => {
         <div className="nav-right">
           {/* Notifications */}
           {user && (
-            <div className="notifications-container">
+            <div className="notifications-container" ref={notificationsRef}>
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
                 className="notifications-btn"
@@ -179,9 +180,16 @@ const Navbar = () => {
                     )}
                   </div>
                   <div className="notifications-footer">
-                    <button className="notifications-view-all">
+                    <Link 
+                      to="/notifications" 
+                      className="notifications-view-all"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowNotifications(false);
+                      }}
+                    >
                       View All Notifications
-                    </button>
+                    </Link>
                   </div>
                 </div>
               )}
@@ -219,6 +227,13 @@ const Navbar = () => {
                       >
                         <User className="dropdown-icon" />
                         My Profile
+                      </Link>
+                      <Link
+                        to="/notifications"
+                        onClick={() => setShowUserMenu(false)}
+                        className="dropdown-item"
+                      >
+                        Notifications
                       </Link>
                       <button
                         onClick={handleLogout}
@@ -282,6 +297,13 @@ const Navbar = () => {
                     className="mobile-nav-link"
                   >
                     My Profile
+                  </Link>
+                  <Link
+                    to="/notifications"
+                    onClick={() => setIsOpen(false)}
+                    className="mobile-nav-link"
+                  >
+                    Notifications
                   </Link>
                   <button
                     onClick={handleLogout}

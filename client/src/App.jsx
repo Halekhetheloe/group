@@ -26,6 +26,7 @@ import Privacy from './pages/Privacy'
 import Terms from './pages/Terms'
 import Sitemap from './pages/Sitemap'
 import FAQ from './pages/FAQ'
+import Notifications from './pages/Notifications'
 
 // Dashboard & Profile Redirects
 import DashboardRedirect from './components/shared/DashboardRedirect'
@@ -126,6 +127,16 @@ function App() {
                 <Route path="/faq" element={<FAQ />} />
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/terms" element={<Terms />} />
+                <Route
+  path="/notifications"
+  element={
+    <ProtectedRoute allowedRoles={['student', 'institution', 'company', 'admin']}>
+      <Layout>
+        <Notifications />
+      </Layout>
+    </ProtectedRoute>
+  }
+/>
 
                 {/* Auth Routes */}
                 <Route path="/login" element={<Login />} />

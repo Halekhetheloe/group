@@ -96,6 +96,7 @@ const Sitemap = () => {
         { name: 'Terms of Service', path: '/terms', description: 'Platform terms and conditions' },
         { name: 'FAQ', path: '/faq', description: 'Frequently asked questions' },
         { name: 'Site Map', path: '/sitemap', description: 'Complete platform navigation' },
+        { name: 'Notifications', path: '/notifications', description: 'View all your notifications', loginRequired: true },
       ]
     }
   ];
@@ -121,40 +122,6 @@ const Sitemap = () => {
       dynamic: 'bg-blue-100 text-blue-800'
     };
     return colorMap[type] || 'bg-gray-100 text-gray-800';
-  };
-
-  const routeExists = (path) => {
-    const existingRoutes = [
-      '/', '/about', '/contact', '/privacy', '/terms', '/sitemap', '/faq',
-      '/login', '/register', '/verify-email', '/forgot-password', '/pending-approval',
-      '/dashboard', '/profile', '/courses', '/jobs', '/institutions',
-      '/apply/:courseId', '/jobs/:jobId/apply',
-      // Student routes
-      '/student/dashboard', '/student/courses', '/student/applications', 
-      '/student/admissions', '/student/transcripts', '/student/jobs',
-      '/student/job-applications', '/student/profile',
-      // Institution routes
-      '/institution/dashboard', '/institution/faculties', '/institution/courses',
-      '/institution/applications', '/institution/admissions', '/institution/students',
-      '/institution/profile',
-      // Company routes
-      '/company/dashboard', '/company/post-job', '/company/jobs',
-      '/company/applicants', '/company/applicant/:applicantId', '/company/profile',
-      // Admin routes
-      '/admin/dashboard', '/admin/applications', '/admin/settings', '/admin/users',
-      '/admin/institutions', '/admin/courses', '/admin/companies', '/admin/reports',
-      '/admin/analytics', '/admin/profile'
-    ];
-    
-    // Check if path matches any existing route pattern
-    return existingRoutes.some(route => {
-      if (route.includes(':')) {
-        // For dynamic routes, check if the base path matches
-        const basePath = route.split('/:')[0];
-        return path.startsWith(basePath);
-      }
-      return route === path;
-    });
   };
 
   return (
@@ -267,16 +234,7 @@ const Sitemap = () => {
                         <code className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
                           {page.path}
                         </code>
-                        {routeExists(page.path) ? (
-                          <Link 
-                            to={page.path}
-                            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                          >
-                            Visit →
-                          </Link>
-                        ) : (
-                          <span className="text-gray-400 text-sm font-medium">Coming Soon</span>
-                        )}
+                        {/* Removed Visit button - only showing path */}
                       </div>
                     </div>
                   ))}
@@ -299,14 +257,14 @@ const Sitemap = () => {
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link 
                 to="/contact" 
-                className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors duration-200"
+                className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors duration-200"
               >
                 <span className="mr-2">📧</span>
                 Contact Support
               </Link>
               <Link 
                 to="/faq" 
-                className="inline-flex items-center px-6 py-3 bg-white text-blue-600 border border-blue-600 rounded-lg font-semibold hover:bg-blue-50 transition-colors duration-200"
+                className="inline-flex items-center px-6 py-3 bg-white text-blue-600 border border-blue-600 rounded-lg font-medium hover:bg-blue-50 transition-colors duration-200"
               >
                 <span className="mr-2">❓</span>
                 View FAQ
