@@ -27,6 +27,24 @@ const ApplicationReview = () => {
     filterApplications()
   }, [applications, searchTerm, statusFilter, courseFilter])
 
+  // Helper function to handle missing student data
+  const getStudentDisplayInfo = (application) => {
+    // Check multiple possible locations for student data
+    const studentInfo = {
+      name: application.student?.displayName || 
+            application.studentName || 
+            (application.student?.email ? application.student.email.split('@')[0] : null) ||
+            'Unknown Student',
+      email: application.student?.email || 
+             application.studentEmail || 
+             'No email provided',
+      displayName: application.student?.displayName || 
+                   application.studentName || 
+                   'Unknown Student'
+    }
+    return studentInfo
+  }
+
   const fetchData = async () => {
     try {
       setLoading(true)
@@ -92,6 +110,7 @@ const ApplicationReview = () => {
               try {
                 const studentDoc = await getDoc(doc(db, 'users', application.studentId))
                 studentData = studentDoc.exists() ? studentDoc.data() : null
+                console.log(`👤 Student data for ${application.studentId}:`, studentData)
               } catch (error) {
                 console.error('Error fetching student:', error)
               }
@@ -170,15 +189,23 @@ const ApplicationReview = () => {
       courseFilter
     })
 
+    // Debug: Log current applications before filtering
+    console.log('📊 Applications before filtering:', applications.map(app => ({
+      id: app.id,
+      studentName: getStudentDisplayInfo(app).name,
+      status: app.status
+    })))
+
     // Search filter
     if (searchTerm) {
       filtered = filtered.filter(app => {
+        const studentInfo = getStudentDisplayInfo(app)
         const matches = (
-          app.student?.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          app.student?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          studentInfo.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          studentInfo.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
           app.course?.name?.toLowerCase().includes(searchTerm.toLowerCase())
         )
-        console.log(`🔍 Search filter for ${app.student?.displayName}: ${matches}`)
+        console.log(`🔍 Search filter for ${studentInfo.name}: ${matches}`)
         return matches
       })
     }
@@ -187,7 +214,8 @@ const ApplicationReview = () => {
     if (statusFilter !== 'all') {
       filtered = filtered.filter(app => {
         const matches = app.status === statusFilter
-        console.log(`🔍 Status filter for ${app.student?.displayName}: ${app.status} === ${statusFilter} = ${matches}`)
+        const studentInfo = getStudentDisplayInfo(app)
+        console.log(`🔍 Status filter for ${studentInfo.name}: ${app.status} === ${statusFilter} = ${matches}`)
         return matches
       })
     }
@@ -196,12 +224,23 @@ const ApplicationReview = () => {
     if (courseFilter !== 'all') {
       filtered = filtered.filter(app => {
         const matches = app.courseId === courseFilter
-        console.log(`🔍 Course filter for ${app.student?.displayName}: ${app.courseId} === ${courseFilter} = ${matches}`)
+        const studentInfo = getStudentDisplayInfo(app)
+        console.log(`🔍 Course filter for ${studentInfo.name}: ${app.courseId} === ${courseFilter} = ${matches}`)
         return matches
       })
     }
 
     console.log('✅ Filtered applications:', filtered.length)
+    
+    // Debug: Log what will be displayed
+    console.log('🎯 APPLICATIONS TO DISPLAY:', filtered.map(app => ({
+      id: app.id,
+      studentName: getStudentDisplayInfo(app).name,
+      email: getStudentDisplayInfo(app).email,
+      status: app.status,
+      course: app.course?.name
+    })))
+    
     setFilteredApplications(filtered)
   }
 
@@ -304,7 +343,7 @@ const ApplicationReview = () => {
       <h4 className="text-sm font-medium text-yellow-800 mb-2">Debug Information</h4>
       <p className="text-sm text-yellow-700">{debugInfo}</p>
       <p className="text-xs text-yellow-600 mt-1">
-        Institution ID: {userData?.uid} | Courses: {courses.length} | Applications: {applications.length}
+        Institution ID: {userData?.uid} | Courses: {courses.length} | Applications: {applications.length} | Displaying: {filteredApplications.length}
       </p>
       {courses.length > 0 && (
         <div className="mt-2">
@@ -346,6 +385,7 @@ const ApplicationReview = () => {
 
   if (view === 'detail' && selectedApplication) {
     const eligibility = checkEligibility(selectedApplication)
+    const studentInfo = getStudentDisplayInfo(selectedApplication)
     
     return (
       <div className="min-h-screen bg-gray-50 p-6">
@@ -387,13 +427,13 @@ const ApplicationReview = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="text-sm font-medium text-gray-600">Full Name</label>
-                    <p className="text-gray-900">{selectedApplication.student?.displayName || 'N/A'}</p>
+                    <p className="text-gray-900">{studentInfo.name}</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-600">Email</label>
                     <div className="flex items-center text-gray-900">
                       <Mail className="h-4 w-4 mr-2" />
-                      {selectedApplication.student?.email || 'N/A'}
+                      {studentInfo.email}
                     </div>
                   </div>
                   {selectedApplication.profile?.phone && (
@@ -740,6 +780,8 @@ const ApplicationReview = () => {
         <div className="space-y-4">
           {filteredApplications.map((application) => {
             const eligibility = checkEligibility(application)
+            const studentInfo = getStudentDisplayInfo(application)
+            
             return (
               <div key={application.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                 <div className="flex items-center justify-between">
@@ -751,12 +793,12 @@ const ApplicationReview = () => {
                     </div>
                     <div>
                       <h3 className="text-lg font-semibold text-gray-900">
-                        {application.student?.displayName || 'Unknown Student'}
+                        {studentInfo.name}
                       </h3>
                       <div className="flex items-center space-x-4 mt-1">
                         <div className="flex items-center text-sm text-gray-600">
                           <Mail className="h-4 w-4 mr-1" />
-                          {application.student?.email || 'No email'}
+                          {studentInfo.email}
                         </div>
                         <div className="flex items-center text-sm text-gray-600">
                           <span className="font-medium">{application.course?.name || 'Unknown Course'}</span>
