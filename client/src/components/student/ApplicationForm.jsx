@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { doc, getDoc, addDoc, collection, query, where, getDocs } from 'firebase/firestore'
 import { db } from '../../firebase-config'
 import { useAuth } from '../../hooks/useAuth'
-import { ArrowLeft, CheckCircle, AlertCircle } from 'lucide-react'
+import { ArrowLeft, CheckCircle, AlertCircle, Plus, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const ApplicationForm = () => {
@@ -15,7 +15,8 @@ const ApplicationForm = () => {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [formData, setFormData] = useState({
-    personalStatement: ''
+    personalStatement: '',
+    grades: [{ subject: '', grade: '' }]
   })
   const [errors, setErrors] = useState({})
   const [hasApplied, setHasApplied] = useState(false)
@@ -87,8 +88,40 @@ const ApplicationForm = () => {
       newErrors.personalStatement = 'Personal statement should be at least 100 characters'
     }
     
+    // Validate grades
+    if (formData.grades.length === 0) {
+      newErrors.grades = 'At least one grade is required'
+    } else {
+      const invalidGrades = formData.grades.filter(grade => !grade.subject.trim() || !grade.grade)
+      if (invalidGrades.length > 0) {
+        newErrors.grades = 'All grades must have both subject and grade selected'
+      }
+    }
+    
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
+  }
+
+  const handleGradeChange = (index, field, value) => {
+    const updatedGrades = [...formData.grades]
+    updatedGrades[index][field] = value
+    setFormData(prev => ({ ...prev, grades: updatedGrades }))
+  }
+
+  const addGrade = () => {
+    setFormData(prev => ({
+      ...prev,
+      grades: [...prev.grades, { subject: '', grade: '' }]
+    }))
+  }
+
+  const removeGrade = (index) => {
+    if (formData.grades.length > 1) {
+      setFormData(prev => ({
+        ...prev,
+        grades: prev.grades.filter((_, i) => i !== index)
+      }))
+    }
   }
 
   const handleSubmit = async (e) => {
@@ -114,6 +147,7 @@ const ApplicationForm = () => {
         courseId: courseId,
         institutionId: course.institutionId,
         personalStatement: formData.personalStatement.trim(),
+        grades: formData.grades.filter(grade => grade.subject.trim() && grade.grade),
         status: 'pending',
         appliedAt: new Date(),
         // Student profile information
@@ -132,6 +166,33 @@ const ApplicationForm = () => {
       setSubmitting(false)
     }
   }
+
+  const gradeOptions = [
+    'A*', 'A', 'B', 'C', 'D'
+  ]
+
+  const commonSubjects = [
+    'Mathematics',
+    'English Language',
+    'English Literature',
+    'Physics',
+    'Chemistry',
+    'Biology',
+    'History',
+    'Geography',
+    'French',
+    'Spanish',
+    'Computer Science',
+    'Business Studies',
+    'Economics',
+    'Accounting',
+    'Art and Design',
+    'Music',
+    'Physical Education',
+    'Religious Studies',
+    'Sociology',
+    'Psychology'
+  ]
 
   if (loading) {
     return (
@@ -276,6 +337,88 @@ const ApplicationForm = () => {
 
         {/* Application Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Academic Grades */}
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 transition-all duration-300 hover:shadow-xl">
+            <h2 className="text-xl font-bold text-gray-900 mb-6 pb-3 border-b border-gray-200">Academic Grades</h2>
+            
+            <div className="space-y-4">
+              {formData.grades.map((grade, index) => (
+                <div key={index} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Subject {index + 1}
+                    </label>
+                    <select
+                      value={grade.subject}
+                      onChange={(e) => handleGradeChange(index, 'subject', e.target.value)}
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 text-gray-900"
+                    >
+                      <option value="">Select Subject</option>
+                      {commonSubjects.map((subject) => (
+                        <option key={subject} value={subject}>
+                          {subject}
+                        </option>
+                      ))}
+                      <option value="Other">Other (Please specify)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Grade
+                    </label>
+                    <select
+                      value={grade.grade}
+                      onChange={(e) => handleGradeChange(index, 'grade', e.target.value)}
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 text-gray-900"
+                    >
+                      <option value="">Select Grade</option>
+                      {gradeOptions.map((gradeOption) => (
+                        <option key={gradeOption} value={gradeOption}>
+                          {gradeOption}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex space-x-2">
+                    {formData.grades.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeGrade(index)}
+                        className="bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 flex items-center justify-center flex-1"
+                      >
+                        <X className="h-5 w-5" />
+                      </button>
+                    )}
+                    {index === formData.grades.length - 1 && (
+                      <button
+                        type="button"
+                        onClick={addGrade}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 flex items-center justify-center flex-1"
+                      >
+                        <Plus className="h-5 w-5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {errors.grades && (
+              <p className="text-red-600 font-medium mt-4 flex items-center">
+                <AlertCircle className="h-4 w-4 mr-2" />
+                {errors.grades}
+              </p>
+            )}
+
+            <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-200">
+              <p className="text-sm text-blue-800">
+                <strong>Note:</strong> Please add all your relevant academic grades. Include subjects that are required for this course admission.
+              </p>
+            </div>
+          </div>
+
           {/* Personal Statement */}
           <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 transition-all duration-300 hover:shadow-xl">
             <h2 className="text-xl font-bold text-gray-900 mb-6 pb-3 border-b border-gray-200">Personal Statement</h2>
