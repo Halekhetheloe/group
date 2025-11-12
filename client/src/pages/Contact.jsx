@@ -96,7 +96,7 @@ const Contact = () => {
       icon: Users,
       title: 'Company Support',
       description: 'Help with job postings and applicant management',
-      contact: 'mokhothu@lesothocareerguide.co.ls'
+      contact: 'mokhothuhalekhetheloe@gmail.com'
     }
   ]
 

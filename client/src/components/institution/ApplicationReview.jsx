@@ -15,7 +15,6 @@ const ApplicationReview = () => {
   const [courseFilter, setCourseFilter] = useState('all')
   const [selectedApplication, setSelectedApplication] = useState(null)
   const [view, setView] = useState('list')
-  const [debugInfo, setDebugInfo] = useState('')
 
   useEffect(() => {
     if (userData) {
@@ -29,7 +28,6 @@ const ApplicationReview = () => {
 
   // Helper function to handle missing student data
   const getStudentDisplayInfo = (application) => {
-    // Check multiple possible locations for student data
     const studentInfo = {
       name: application.student?.displayName || 
             application.studentName || 
@@ -48,7 +46,6 @@ const ApplicationReview = () => {
   const fetchData = async () => {
     try {
       setLoading(true)
-      console.log('🔍 Starting data fetch for institution:', userData.uid)
       
       // Fetch institution's courses
       const coursesQuery = query(
@@ -62,17 +59,12 @@ const ApplicationReview = () => {
       }))
       setCourses(coursesData)
 
-      console.log('📚 Found courses:', coursesData)
-
       // Fetch applications for institution's courses
       const courseIds = coursesData.map(course => course.id)
       let allApplications = []
       
-      console.log('🎯 Course IDs to search:', courseIds)
-
       if (courseIds.length > 0) {
         // Fetch all applications and filter by course IDs
-        console.log('📨 Fetching all applications...')
         const applicationsQuery = query(
           collection(db, 'applications'),
           orderBy('appliedAt', 'desc')
@@ -83,24 +75,13 @@ const ApplicationReview = () => {
           ...doc.data()
         }))
         
-        console.log('📄 Raw applications found:', rawApplications)
-        
         // Filter applications that belong to institution's courses
-        allApplications = rawApplications.filter(app => {
-          const matches = courseIds.includes(app.courseId)
-          console.log(`🔍 Application ${app.id} courseId: ${app.courseId}, matches: ${matches}`)
-          return matches
-        })
-        
-        console.log('✅ Filtered applications for institution:', allApplications)
+        allApplications = rawApplications.filter(app => courseIds.includes(app.courseId))
 
         // Fetch student details for each application
-        console.log('👨‍🎓 Fetching student details...')
         const applicationsWithDetails = await Promise.all(
           allApplications.map(async (application) => {
             try {
-              console.log(`📋 Processing application ${application.id} for student ${application.studentId}`)
-              
               let studentData = null
               let studentProfile = {}
               let transcripts = []
@@ -110,7 +91,6 @@ const ApplicationReview = () => {
               try {
                 const studentDoc = await getDoc(doc(db, 'users', application.studentId))
                 studentData = studentDoc.exists() ? studentDoc.data() : null
-                console.log(`👤 Student data for ${application.studentId}:`, studentData)
               } catch (error) {
                 console.error('Error fetching student:', error)
               }
@@ -146,11 +126,10 @@ const ApplicationReview = () => {
                 course: course
               }
 
-              console.log(`✅ Processed application:`, applicationWithDetails)
               return applicationWithDetails
 
             } catch (error) {
-              console.error(`❌ Error processing application ${application.id}:`, error)
+              console.error(`Error processing application ${application.id}:`, error)
               return {
                 ...application,
                 student: null,
@@ -162,18 +141,13 @@ const ApplicationReview = () => {
           })
         )
 
-        console.log('🎉 Final applications with details:', applicationsWithDetails)
         setApplications(applicationsWithDetails)
-        setDebugInfo(`Found ${coursesData.length} courses and ${applicationsWithDetails.length} applications`)
       } else {
-        console.log('❌ No courses found for this institution')
-        setDebugInfo('No courses found for this institution')
         setApplications([])
       }
 
     } catch (error) {
-      console.error('❌ Error fetching data:', error)
-      setDebugInfo(`Error: ${error.message}`)
+      console.error('Error fetching data:', error)
     } finally {
       setLoading(false)
     }
@@ -182,65 +156,28 @@ const ApplicationReview = () => {
   const filterApplications = () => {
     let filtered = applications
 
-    console.log('🔍 Filtering applications:', {
-      total: applications.length,
-      searchTerm,
-      statusFilter,
-      courseFilter
-    })
-
-    // Debug: Log current applications before filtering
-    console.log('📊 Applications before filtering:', applications.map(app => ({
-      id: app.id,
-      studentName: getStudentDisplayInfo(app).name,
-      status: app.status
-    })))
-
     // Search filter
     if (searchTerm) {
       filtered = filtered.filter(app => {
         const studentInfo = getStudentDisplayInfo(app)
-        const matches = (
+        return (
           studentInfo.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
           studentInfo.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
           app.course?.name?.toLowerCase().includes(searchTerm.toLowerCase())
         )
-        console.log(`🔍 Search filter for ${studentInfo.name}: ${matches}`)
-        return matches
       })
     }
 
     // Status filter
     if (statusFilter !== 'all') {
-      filtered = filtered.filter(app => {
-        const matches = app.status === statusFilter
-        const studentInfo = getStudentDisplayInfo(app)
-        console.log(`🔍 Status filter for ${studentInfo.name}: ${app.status} === ${statusFilter} = ${matches}`)
-        return matches
-      })
+      filtered = filtered.filter(app => app.status === statusFilter)
     }
 
     // Course filter
     if (courseFilter !== 'all') {
-      filtered = filtered.filter(app => {
-        const matches = app.courseId === courseFilter
-        const studentInfo = getStudentDisplayInfo(app)
-        console.log(`🔍 Course filter for ${studentInfo.name}: ${app.courseId} === ${courseFilter} = ${matches}`)
-        return matches
-      })
+      filtered = filtered.filter(app => app.courseId === courseFilter)
     }
 
-    console.log('✅ Filtered applications:', filtered.length)
-    
-    // Debug: Log what will be displayed
-    console.log('🎯 APPLICATIONS TO DISPLAY:', filtered.map(app => ({
-      id: app.id,
-      studentName: getStudentDisplayInfo(app).name,
-      email: getStudentDisplayInfo(app).email,
-      status: app.status,
-      course: app.course?.name
-    })))
-    
     setFilteredApplications(filtered)
   }
 
@@ -337,34 +274,6 @@ const ApplicationReview = () => {
     return meetsRequirements ? 'eligible' : 'not-eligible'
   }
 
-  // Debug info display
-  const DebugInfo = () => (
-    <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-      <h4 className="text-sm font-medium text-yellow-800 mb-2">Debug Information</h4>
-      <p className="text-sm text-yellow-700">{debugInfo}</p>
-      <p className="text-xs text-yellow-600 mt-1">
-        Institution ID: {userData?.uid} | Courses: {courses.length} | Applications: {applications.length} | Displaying: {filteredApplications.length}
-      </p>
-      {courses.length > 0 && (
-        <div className="mt-2">
-          <p className="text-xs text-yellow-600">Course IDs: {courses.map(c => c.id).join(', ')}</p>
-        </div>
-      )}
-      <div className="mt-2">
-        <button
-          onClick={() => {
-            setSearchTerm('')
-            setStatusFilter('all')
-            setCourseFilter('all')
-          }}
-          className="bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-1 rounded text-xs font-medium"
-        >
-          Clear All Filters
-        </button>
-      </div>
-    </div>
-  )
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 p-6">
@@ -390,9 +299,6 @@ const ApplicationReview = () => {
     return (
       <div className="min-h-screen bg-gray-50 p-6">
         <div className="max-w-6xl mx-auto">
-          {/* Debug info */}
-          <DebugInfo />
-          
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-4">
@@ -723,9 +629,6 @@ const ApplicationReview = () => {
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
-        {/* Debug info */}
-        <DebugInfo />
-        
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Application Review</h1>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { collection, query, where, getDocs, doc, getDoc, orderBy } from 'firebase/firestore'
+import { collection, query, where, getDocs, doc, getDoc, orderBy, updateDoc } from 'firebase/firestore'
 import { db } from '../../firebase-config'
 import { useAuth } from '../../hooks/useAuth'
 
@@ -14,6 +14,8 @@ const MyApplications = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [typeFilter, setTypeFilter] = useState('all')
+  const [selectedApplication, setSelectedApplication] = useState(null)
+  const [showDetailsModal, setShowDetailsModal] = useState(false)
 
   console.log('🎯 MyApplications component is rendering for user:', userData?.uid)
 
@@ -170,6 +172,59 @@ const MyApplications = () => {
     setFilteredApplications(filtered)
   }
 
+  // View Details Handler
+  const handleViewDetails = (application) => {
+    console.log('🔍 Viewing details for application:', application.id)
+    setSelectedApplication(application)
+    setShowDetailsModal(true)
+  }
+
+  // Accept Offer Handler
+  const handleAcceptOffer = async (application) => {
+    try {
+      console.log('✅ Accepting offer for application:', application.id)
+      
+      // Update application status in Firestore
+      const applicationRef = doc(db, 'applications', application.id)
+      await updateDoc(applicationRef, {
+        status: 'accepted',
+        acceptedAt: new Date()
+      })
+
+      // Show success message
+      alert('Offer accepted successfully!')
+      
+      // Refresh applications
+      await fetchApplications()
+      
+    } catch (error) {
+      console.error('❌ Error accepting offer:', error)
+      alert('Error accepting offer. Please try again.')
+    }
+  }
+
+  // Contact Handler
+  const handleContact = (application) => {
+    console.log('📞 Contact for application:', application.id)
+    
+    // You can implement different contact methods based on application type
+    if (application.applicationType === 'job') {
+      // For jobs, you might want to show company contact info
+      alert(`Contact the company at: ${application.companyEmail || 'No contact email available'}`)
+    } else if (application.applicationType === 'course') {
+      // For courses, show institution contact info
+      alert(`Contact the institution at: ${application.institution?.contactEmail || 'No contact email available'}`)
+    } else {
+      alert('Contact information not available.')
+    }
+  }
+
+  // Close Modal Handler
+  const handleCloseModal = () => {
+    setShowDetailsModal(false)
+    setSelectedApplication(null)
+  }
+
   const getStatusBadge = (status) => {
     const statusConfig = {
       pending: { color: 'bg-yellow-100 text-yellow-800', label: 'Under Review' },
@@ -266,12 +321,6 @@ const MyApplications = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
       <div className="max-w-7xl mx-auto">
-        {/* Debug Banner */}
-        <div className="mb-4 p-4 bg-green-100 border border-green-300 rounded-lg">
-          <p className="text-green-800 font-medium">✅ MyApplications component is working!</p>
-          <p className="text-green-700 text-sm">User: {userData?.uid} | Applications: {applications.length}</p>
-        </div>
-
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-slate-800">My Applications</h1>
@@ -286,7 +335,9 @@ const MyApplications = () => {
             <div className="flex-1 max-w-md">
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <div className="h-4 w-4 bg-slate-400 rounded"></div>
+                  <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
                 </div>
                 <input
                   type="text"
@@ -347,18 +398,25 @@ const MyApplications = () => {
                       </div>
                       <div className="flex items-center space-x-4 mt-2">
                         <div className="flex items-center text-sm text-slate-600">
-                          <div className="h-4 w-4 bg-slate-400 rounded mr-1"></div>
+                          <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                          </svg>
                           {getOrganizationName(application)}
                         </div>
                         {application.location && (
                           <div className="flex items-center text-sm text-slate-600">
-                            <div className="h-4 w-4 bg-slate-400 rounded mr-1"></div>
+                            <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
                             {application.location}
                           </div>
                         )}
                         {application.jobType && (
                           <div className="flex items-center text-sm text-slate-600">
-                            <div className="h-4 w-4 bg-slate-400 rounded mr-1"></div>
+                            <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
                             {application.jobType}
                           </div>
                         )}
@@ -387,7 +445,9 @@ const MyApplications = () => {
                     
                     {application.appliedAt && (
                       <div className="mt-2 flex items-center text-sm text-slate-600">
-                        <div className="h-4 w-4 bg-slate-400 rounded mr-1"></div>
+                        <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
                         Applied on {formatDate(application.appliedAt)}
                       </div>
                     )}
@@ -406,19 +466,28 @@ const MyApplications = () => {
 
                 {/* Action Buttons */}
                 <div className="flex lg:flex-col space-x-2 lg:space-x-0 lg:space-y-2 mt-4 lg:mt-0 lg:ml-6">
-                  <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
+                  <button 
+                    onClick={() => handleViewDetails(application)}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                  >
                     View Details
                   </button>
                   
                   {/* Special actions based on status and type */}
                   {(application.status === 'admitted' || application.status === 'accepted') && (
-                    <button className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm font-medium">
+                    <button 
+                      onClick={() => handleAcceptOffer(application)}
+                      className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                    >
                       Accept Offer
                     </button>
                   )}
                   
                   {(application.status === 'pending' || application.status === 'under_review') && (
-                    <button className="bg-slate-600 text-white px-4 py-2 rounded-lg hover:bg-slate-700 transition-colors text-sm font-medium">
+                    <button 
+                      onClick={() => handleContact(application)}
+                      className="bg-slate-600 text-white px-4 py-2 rounded-lg hover:bg-slate-700 transition-colors text-sm font-medium"
+                    >
                       Contact
                     </button>
                   )}
@@ -433,7 +502,9 @@ const MyApplications = () => {
           <div className="text-center py-12">
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 max-w-md mx-auto">
               <div className="h-16 w-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <div className="h-8 w-8 bg-slate-300 rounded"></div>
+                <svg className="h-8 w-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
               </div>
               <h3 className="text-lg font-semibold text-slate-800 mb-2">No Applications Found</h3>
               <p className="text-slate-600 mb-6">
@@ -493,6 +564,95 @@ const MyApplications = () => {
           </div>
         )}
       </div>
+
+      {/* Details Modal */}
+      {showDetailsModal && selectedApplication && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-semibold text-slate-800">Application Details</h3>
+                <button 
+                  onClick={handleCloseModal}
+                  className="text-slate-400 hover:text-slate-600"
+                >
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-medium text-slate-700">Application Type</h4>
+                  <p className="text-slate-600 capitalize">{selectedApplication.applicationType}</p>
+                </div>
+                
+                <div>
+                  <h4 className="font-medium text-slate-700">Title</h4>
+                  <p className="text-slate-600">{getApplicationTitle(selectedApplication)}</p>
+                </div>
+                
+                <div>
+                  <h4 className="font-medium text-slate-700">Organization</h4>
+                  <p className="text-slate-600">{getOrganizationName(selectedApplication)}</p>
+                </div>
+                
+                <div>
+                  <h4 className="font-medium text-slate-700">Status</h4>
+                  <div className="mt-1">{getStatusBadge(selectedApplication.status)}</div>
+                </div>
+                
+                <div>
+                  <h4 className="font-medium text-slate-700">Applied Date</h4>
+                  <p className="text-slate-600">{formatDate(selectedApplication.appliedAt)}</p>
+                </div>
+                
+                {selectedApplication.coverLetter && (
+                  <div>
+                    <h4 className="font-medium text-slate-700">Cover Letter</h4>
+                    <p className="text-slate-600 mt-1 whitespace-pre-wrap">{selectedApplication.coverLetter}</p>
+                  </div>
+                )}
+                
+                {selectedApplication.resumeUrl && (
+                  <div>
+                    <h4 className="font-medium text-slate-700">Resume</h4>
+                    <a 
+                      href={selectedApplication.resumeUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-800"
+                    >
+                      View Resume
+                    </a>
+                  </div>
+                )}
+              </div>
+              
+              <div className="mt-6 flex justify-end space-x-3">
+                <button 
+                  onClick={handleCloseModal}
+                  className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50"
+                >
+                  Close
+                </button>
+                {(selectedApplication.status === 'admitted' || selectedApplication.status === 'accepted') && (
+                  <button 
+                    onClick={() => {
+                      handleAcceptOffer(selectedApplication)
+                      handleCloseModal()
+                    }}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                  >
+                    Accept Offer
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

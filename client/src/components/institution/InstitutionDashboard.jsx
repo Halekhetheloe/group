@@ -16,7 +16,6 @@ const InstitutionDashboard = () => {
   const [recentApplications, setRecentApplications] = useState([])
   const [popularCourses, setPopularCourses] = useState([])
   const [loading, setLoading] = useState(true)
-  const [debugInfo, setDebugInfo] = useState('') // For debugging
 
   useEffect(() => {
     if (userData) {
@@ -27,13 +26,11 @@ const InstitutionDashboard = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true)
-      console.log('🔍 Fetching dashboard data for institution:', userData.uid)
-      console.log('📊 User data:', userData)
       
-      // Fetch institution's courses - FIXED: Use institutionId from userData
+      // Fetch institution's courses
       const coursesQuery = query(
         collection(db, 'courses'),
-        where('institutionId', '==', userData.institutionId || userData.uid) // Try both
+        where('institutionId', '==', userData.institutionId || userData.uid)
       )
       const coursesSnapshot = await getDocs(coursesQuery)
       const courses = coursesSnapshot.docs.map(doc => ({
@@ -41,14 +38,10 @@ const InstitutionDashboard = () => {
         ...doc.data()
       }))
 
-      console.log('📚 Found courses:', courses.length, courses)
-
       // Fetch applications for institution's courses
       const courseIds = courses.map(course => course.id)
       let allApplications = []
       
-      console.log('🎯 Course IDs to search:', courseIds)
-
       if (courseIds.length > 0) {
         // Since Firestore doesn't support 'in' with more than 10 items, we'll fetch all and filter
         const applicationsQuery = query(
@@ -63,10 +56,6 @@ const InstitutionDashboard = () => {
           }))
           .filter(app => courseIds.includes(app.courseId))
           .slice(0, 10) // Limit to 10 most recent
-
-        console.log('📨 Found applications:', allApplications.length, allApplications)
-      } else {
-        console.log('❌ No courses found, skipping applications fetch')
       }
 
       // Calculate stats
@@ -76,13 +65,6 @@ const InstitutionDashboard = () => {
       const admittedStudents = allApplications.filter(app => 
         app.status === 'admitted' || app.status === 'accepted'
       ).length
-
-      console.log('📈 Calculated stats:', {
-        totalCourses: courses.length,
-        totalApplications: allApplications.length,
-        pendingApplications,
-        admittedStudents
-      })
 
       setStats({
         totalCourses: courses.length,
@@ -110,12 +92,8 @@ const InstitutionDashboard = () => {
       
       setPopularCourses(popular)
 
-      // Set debug info
-      setDebugInfo(`Courses: ${courses.length}, Applications: ${allApplications.length}`)
-
     } catch (error) {
-      console.error('❌ Error fetching dashboard data:', error)
-      setDebugInfo(`Error: ${error.message}`)
+      console.error('Error fetching dashboard data:', error)
     } finally {
       setLoading(false)
     }
@@ -226,14 +204,6 @@ const InstitutionDashboard = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
       <div className="max-w-7xl mx-auto">
-        {/* Debug info - remove in production */}
-        {debugInfo && (
-          <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <p className="text-sm text-yellow-800">Debug: {debugInfo}</p>
-            <p className="text-xs text-yellow-600 mt-1">Institution ID: {userData?.institutionId || userData?.uid}</p>
-          </div>
-        )}
-
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-slate-900">Institution Dashboard</h1>

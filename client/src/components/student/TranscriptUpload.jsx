@@ -43,6 +43,7 @@ const TranscriptUpload = () => {
       setTranscripts(transcriptsData)
     } catch (error) {
       console.error('Error fetching transcripts:', error)
+      toast.error('Failed to load transcripts')
     } finally {
       setLoading(false)
     }
@@ -138,7 +139,7 @@ const TranscriptUpload = () => {
       // Save transcript data to Firestore
       const transcriptData = {
         studentId: userData.uid,
-        studentName: userData.displayName,
+        studentName: userData.displayName || userData.email,
         studentEmail: userData.email,
         institutionName: formData.institutionName.trim(),
         program: formData.program.trim(),
@@ -230,9 +231,109 @@ const TranscriptUpload = () => {
     return (totalGPA / transcripts.length).toFixed(2)
   }
 
+  // Add CSS styles
+  const styles = `
+    .btn-primary {
+      background-color: #2563eb;
+      color: white;
+      padding: 0.75rem 1.5rem;
+      border-radius: 0.5rem;
+      font-weight: 500;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+    
+    .btn-primary:hover {
+      background-color: #1d4ed8;
+    }
+    
+    .btn-primary:disabled {
+      background-color: #93c5fd;
+      cursor: not-allowed;
+    }
+    
+    .btn-secondary {
+      background-color: #f8fafc;
+      color: #475569;
+      padding: 0.75rem 1.5rem;
+      border-radius: 0.5rem;
+      font-weight: 500;
+      border: 1px solid #e2e8f0;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+    
+    .btn-secondary:hover {
+      background-color: #f1f5f9;
+    }
+    
+    .card {
+      background-color: white;
+      border-radius: 0.75rem;
+      padding: 1.5rem;
+      box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+      border: 1px solid #e2e8f0;
+    }
+    
+    .input-field {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid #d1d5db;
+      border-radius: 0.5rem;
+      font-size: 0.875rem;
+      transition: all 0.2s;
+    }
+    
+    .input-field:focus {
+      outline: none;
+      ring: 2px;
+      ring-color: #3b82f6;
+      border-color: #3b82f6;
+    }
+    
+    .input-field:focus-visible {
+      outline: 2px solid #3b82f6;
+      outline-offset: 2px;
+    }
+    
+    .form-label {
+      display: block;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: #374151;
+      margin-bottom: 0.5rem;
+    }
+    
+    .error-message {
+      color: #dc2626;
+      font-size: 0.75rem;
+      margin-top: 0.25rem;
+    }
+    
+    .border-red-300 {
+      border-color: #fca5a5;
+    }
+    
+    .focus\\:border-red-500:focus {
+      border-color: #ef4444;
+    }
+    
+    .focus\\:ring-red-500:focus {
+      --tw-ring-color: #ef4444;
+    }
+  `
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 p-6">
+        <style>{styles}</style>
         <div className="max-w-6xl mx-auto">
           <div className="animate-pulse">
             <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
@@ -250,6 +351,7 @@ const TranscriptUpload = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
+      <style>{styles}</style>
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
@@ -412,20 +514,15 @@ const TranscriptUpload = () => {
                       accept=".pdf,.jpg,.jpeg,.png"
                       className="hidden"
                     />
-                    <label htmlFor="file" className="cursor-pointer">
+                    <label htmlFor="file" className="cursor-pointer block">
                       <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                       <p className="text-lg font-medium text-gray-900 mb-2">
-                        {formData.file ? formData.file.name : 'Upload your transcript'}
+                        {formData.file ? formData.file.name : 'Click to upload your transcript'}
                       </p>
                       <p className="text-sm text-gray-600 mb-4">
                         Upload your official transcript or academic record
                       </p>
-                      <button
-                        type="button"
-                        className="btn-primary"
-                      >
-                        Choose File
-                      </button>
+                      {/* Removed the "Choose File" button */}
                     </label>
                     {formData.file && (
                       <p className="text-sm text-gray-500 mt-4">
