@@ -15,7 +15,9 @@ export const getCourses = async (req, res) => {
           description: 'Bachelor of Science in Computer Science',
           requirements: {
             minGrade: 'C',
-            subjects: ['Mathematics', 'English', 'Science']
+            minPoints: 30,
+            subjects: ['Mathematics', 'English', 'Science'],
+            certificates: ['High School Diploma']
           },
           fees: {
             local: 15000,
@@ -35,7 +37,9 @@ export const getCourses = async (req, res) => {
           description: 'Bachelor in Business Information Technology',
           requirements: {
             minGrade: 'D',
-            subjects: ['Mathematics', 'English']
+            minPoints: 25,
+            subjects: ['Mathematics', 'English'],
+            certificates: ['High School Diploma']
           },
           fees: {
             local: 18000,
@@ -55,7 +59,9 @@ export const getCourses = async (req, res) => {
           description: 'Bachelor of Medicine and Bachelor of Surgery',
           requirements: {
             minGrade: 'B',
-            subjects: ['Biology', 'Chemistry', 'Physics', 'Mathematics']
+            minPoints: 40,
+            subjects: ['Biology', 'Chemistry', 'Physics', 'Mathematics'],
+            certificates: ['High School Diploma']
           },
           fees: {
             local: 25000,
@@ -197,45 +203,96 @@ export const getCourseApplications = async (req, res) => {
 export const checkCourseEligibility = async (req, res) => {
   try {
     const { id: courseId } = req.params;
-    const { grades, certificates } = req.body;
+    const { studentId, grades } = req.body;
 
-    if (!grades || !certificates) {
+    if (!studentId && !grades) {
       return res.status(400).json({
         success: false,
         error: 'MISSING_DATA',
-        message: 'Grades and certificates are required for eligibility check'
+        message: 'Either studentId or grades are required for eligibility check'
       });
     }
 
+    let studentGrades = grades;
+
+    // If studentId provided but no grades, fetch student data
+    if (studentId && !grades) {
+      // Mock student data - in real implementation, fetch from database
+      studentGrades = {
+        overall: 'B',
+        points: 45,
+        subjects: {
+          'Mathematics': 'B',
+          'English': 'C',
+          'Science': 'B'
+        }
+      };
+    }
+
+    const course = {
+      id: courseId,
+      name: 'Computer Science',
+      requirements: {
+        minGrade: 'C',
+        minPoints: 30,
+        subjects: ['Mathematics', 'English', 'Science'],
+        certificates: ['High School Diploma']
+      }
+    };
+
+    // Check eligibility
     const eligibility = {
       isEligible: true,
       missingRequirements: [],
-      meetsRequirements: [
-        'Minimum grade requirement met',
-        'Required subjects completed',
-        'Certificate requirements satisfied'
-      ],
+      meetsRequirements: [],
       suggestions: []
     };
 
-    // Mock eligibility check
-    if (grades.overall === 'F') {
-      eligibility.isEligible = false;
-      eligibility.missingRequirements.push('Minimum grade of C required');
-      eligibility.suggestions.push('Improve your overall grades');
+    // Check minimum grade
+    if (course.requirements.minGrade) {
+      const gradeOrder = { 'A': 5, 'B': 4, 'C': 3, 'D': 2, 'E': 1, 'F': 0 };
+      const studentGrade = studentGrades.overall || 'F';
+      
+      if (gradeOrder[studentGrade] >= gradeOrder[course.requirements.minGrade]) {
+        eligibility.meetsRequirements.push(`Meets grade requirement (${course.requirements.minGrade})`);
+      } else {
+        eligibility.isEligible = false;
+        eligibility.missingRequirements.push(`Minimum grade of ${course.requirements.minGrade} required (your grade: ${studentGrade})`);
+      }
+    }
+
+    // Check subjects
+    if (course.requirements.subjects) {
+      const missingSubjects = course.requirements.subjects.filter(
+        subject => !studentGrades.subjects || !studentGrades.subjects[subject]
+      );
+
+      if (missingSubjects.length === 0) {
+        eligibility.meetsRequirements.push('Meets all subject requirements');
+      } else {
+        eligibility.isEligible = false;
+        eligibility.missingRequirements.push(`Missing subjects: ${missingSubjects.join(', ')}`);
+      }
+    }
+
+    // Check minimum points
+    if (course.requirements.minPoints) {
+      const studentPoints = studentGrades.points || 0;
+      if (studentPoints >= course.requirements.minPoints) {
+        eligibility.meetsRequirements.push(`Meets points requirement (${course.requirements.minPoints})`);
+      } else {
+        eligibility.isEligible = false;
+        eligibility.missingRequirements.push(`Minimum ${course.requirements.minPoints} points required (your points: ${studentPoints})`);
+      }
     }
 
     res.json({
       success: true,
       eligibility,
       course: {
-        id: courseId,
-        name: 'Computer Science',
-        requirements: {
-          minGrade: 'C',
-          subjects: ['Mathematics', 'English', 'Science'],
-          certificates: ['High School Diploma']
-        }
+        id: course.id,
+        name: course.name,
+        requirements: course.requirements
       }
     });
   } catch (error) {
@@ -349,4 +406,199 @@ export const getPopularCourses = async (req, res) => {
       message: 'Failed to fetch popular courses'
     });
   }
+};
+
+// New endpoints for grade-based filtering
+export const getEligibleCourses = async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    
+    if (!studentId) {
+      return res.status(400).json({
+        success: false,
+        error: 'STUDENT_ID_REQUIRED',
+        message: 'Student ID is required'
+      });
+    }
+
+    // Mock student data - in real implementation, fetch from database
+    const studentGrades = {
+      overall: 'B',
+      points: 45,
+      subjects: {
+        'Mathematics': 'B',
+        'English': 'C',
+        'Science': 'B',
+        'Biology': 'B'
+      }
+    };
+
+    const allCourses = [
+      {
+        id: 'cs-001',
+        name: 'Computer Science',
+        institutionName: 'National University of Lesotho',
+        faculty: 'Information Technology',
+        duration: 4,
+        requirements: {
+          minGrade: 'C',
+          minPoints: 30,
+          subjects: ['Mathematics', 'English', 'Science'],
+          certificates: ['High School Diploma']
+        }
+      },
+      {
+        id: 'bit-001',
+        name: 'Business Information Technology',
+        institutionName: 'Limkokwing University',
+        faculty: 'Business & IT',
+        duration: 3,
+        requirements: {
+          minGrade: 'D',
+          minPoints: 25,
+          subjects: ['Mathematics', 'English'],
+          certificates: ['High School Diploma']
+        }
+      },
+      {
+        id: 'med-001',
+        name: 'Medicine',
+        institutionName: 'National University of Lesotho',
+        faculty: 'Health Sciences',
+        duration: 6,
+        requirements: {
+          minGrade: 'B',
+          minPoints: 40,
+          subjects: ['Biology', 'Chemistry', 'Physics', 'Mathematics'],
+          certificates: ['High School Diploma']
+        }
+      }
+    ];
+
+    // Filter eligible courses
+    const eligibleCourses = allCourses.filter(course => {
+      const eligibility = checkEligibilityLogic(course, studentGrades);
+      course.eligibility = eligibility;
+      return eligibility.isEligible;
+    });
+
+    res.json({
+      success: true,
+      courses: eligibleCourses,
+      total: eligibleCourses.length,
+      studentGrades: studentGrades
+    });
+  } catch (error) {
+    console.error('Get eligible courses error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'ELIGIBLE_COURSES_FETCH_FAILED',
+      message: 'Failed to fetch eligible courses'
+    });
+  }
+};
+
+export const getRecommendedCourses = async (req, res) => {
+  try {
+    const { studentId } = req.params;
+
+    if (!studentId) {
+      return res.status(400).json({
+        success: false,
+        error: 'STUDENT_ID_REQUIRED',
+        message: 'Student ID is required'
+      });
+    }
+
+    const recommendedCourses = [
+      {
+        id: 'cs-001',
+        name: 'Computer Science',
+        institutionName: 'National University of Lesotho',
+        faculty: 'Information Technology',
+        duration: 4,
+        matchScore: 95,
+        reasons: ['Matches your interests in technology', 'High employment rate'],
+        eligibility: {
+          isEligible: true,
+          meetsRequirements: ['Meets grade requirement (C)', 'Meets all subject requirements']
+        }
+      },
+      {
+        id: 'se-001',
+        name: 'Software Engineering',
+        institutionName: 'National University of Lesotho',
+        faculty: 'Information Technology',
+        duration: 4,
+        matchScore: 88,
+        reasons: ['Strong alignment with your skills', 'Growing industry demand'],
+        eligibility: {
+          isEligible: true,
+          meetsRequirements: ['Meets grade requirement (C)', 'Meets all subject requirements']
+        }
+      }
+    ];
+
+    res.json({
+      success: true,
+      courses: recommendedCourses
+    });
+  } catch (error) {
+    console.error('Get recommended courses error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'RECOMMENDED_COURSES_FETCH_FAILED',
+      message: 'Failed to fetch recommended courses'
+    });
+  }
+};
+
+// Helper function for eligibility checking
+const checkEligibilityLogic = (course, studentGrades) => {
+  const eligibility = {
+    isEligible: true,
+    missingRequirements: [],
+    meetsRequirements: [],
+    suggestions: []
+  };
+
+  // Check minimum grade requirement
+  if (course.requirements.minGrade) {
+    const gradeOrder = { 'A': 5, 'B': 4, 'C': 3, 'D': 2, 'E': 1, 'F': 0 };
+    const studentGrade = studentGrades.overall || 'F';
+    
+    if (gradeOrder[studentGrade] >= gradeOrder[course.requirements.minGrade]) {
+      eligibility.meetsRequirements.push(`Meets grade requirement (${course.requirements.minGrade})`);
+    } else {
+      eligibility.isEligible = false;
+      eligibility.missingRequirements.push(`Minimum grade of ${course.requirements.minGrade} required`);
+    }
+  }
+
+  // Check subject requirements
+  if (course.requirements.subjects && course.requirements.subjects.length > 0) {
+    const missingSubjects = course.requirements.subjects.filter(
+      subject => !studentGrades.subjects || !studentGrades.subjects[subject]
+    );
+
+    if (missingSubjects.length === 0) {
+      eligibility.meetsRequirements.push('Meets all subject requirements');
+    } else {
+      eligibility.isEligible = false;
+      eligibility.missingRequirements.push(`Missing subjects: ${missingSubjects.join(', ')}`);
+    }
+  }
+
+  // Check minimum points
+  if (course.requirements.minPoints) {
+    const studentPoints = studentGrades.points || 0;
+    if (studentPoints >= course.requirements.minPoints) {
+      eligibility.meetsRequirements.push(`Meets points requirement (${course.requirements.minPoints})`);
+    } else {
+      eligibility.isEligible = false;
+      eligibility.missingRequirements.push(`Minimum ${course.requirements.minPoints} points required`);
+    }
+  }
+
+  return eligibility;
 };

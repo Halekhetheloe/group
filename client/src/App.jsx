@@ -14,7 +14,7 @@ import EmailVerification from './components/auth/EmailVerification'
 import ForgotPassword from './components/auth/ForgotPassword'
 import PendingApproval from './components/auth/PendingApproval'
 
-// Public Pages - FIXED: Added ./ prefix
+// Public Pages
 import Landing from './pages/Landing'
 import Home from './pages/Home'
 import Courses from './pages/Courses'
@@ -27,6 +27,7 @@ import Terms from './pages/Terms'
 import Sitemap from './pages/Sitemap'
 import FAQ from './pages/FAQ'
 import Notifications from './pages/Notifications'
+import JobDetails from './pages/JobDetails'
 
 // Dashboard & Profile Redirects
 import DashboardRedirect from './components/shared/DashboardRedirect'
@@ -35,13 +36,13 @@ import ProfileRedirect from './components/shared/ProfileRedirect'
 // Student Pages
 import StudentDashboard from './components/student/StudentDashboard'
 import CourseBrowser from './components/student/CourseBrowser'
-import ApplicationForm from './components/student/ApplicationForm'
+import QuickApply from './components/student/QuickApply'
 import MyApplications from './components/student/MyApplications'
 import AdmissionsResults from './components/student/AdmissionsResults'
 import TranscriptUpload from './components/student/TranscriptUpload'
 import JobBrowser from './components/student/JobBrowser'
-import JobApplications from './components/student/JobApplications'
 import StudentProfile from './components/student/StudentProfile'
+import GradesEntry from './components/student/GradesEntry'
 
 // Institution Pages
 import InstitutionDashboard from './components/institution/InstitutionDashboard'
@@ -71,9 +72,6 @@ import AdminCourseManagement from './components/admin/CourseManagement'
 import AdminSettings from './components/admin/AdminSettings'
 import AdminApplications from './components/admin/AdminApplications'
 import AdminProfile from './components/admin/AdminProfile'
-
-// Job Application Component
-import JobApplication from './components/student/JobApplication'
 
 // Styles
 import './styles/index.css'
@@ -119,13 +117,13 @@ function App() {
                 <Route path="/home" element={<Home />} />
                 <Route path="/courses" element={<Courses />} />
                 <Route path="/jobs" element={<Jobs />} />
-                <Route path="/jobs/:jobId/apply" element={<JobApplication />} />
                 <Route path="/institutions" element={<Institutions />} />
                 <Route path="/about" element={<About />} />
                 <Route path="/contact" element={<Contact />} />
                 <Route path="/faq" element={<FAQ />} />
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/terms" element={<Terms />} />
+                <Route path="/jobs/:jobId" element={<JobDetails />} />
 
                 {/* Admin-only Sitemap Route */}
                 <Route
@@ -188,7 +186,7 @@ function App() {
                   element={
                     <ProtectedRoute allowedRoles={['student']}>
                       <Layout>
-                        <ApplicationForm />
+                        <QuickApply />
                       </Layout>
                     </ProtectedRoute>
                   }
@@ -220,14 +218,13 @@ function App() {
                   element={
                     <ProtectedRoute allowedRoles={['student']}>
                       <Layout>
-                        <ApplicationForm />
+                        <QuickApply />
                       </Layout>
                     </ProtectedRoute>
                   }
                 />
-                {/* CHANGED: Updated route from /student/my-applications to /student/applications */}
                 <Route
-                  path="/student/MyApplications"
+                  path="/student/applications"
                   element={
                     <ProtectedRoute allowedRoles={['student']}>
                       <Layout>
@@ -266,22 +263,23 @@ function App() {
                     </ProtectedRoute>
                   }
                 />
-                <Route
-                  path="/student/job-applications"
-                  element={
-                    <ProtectedRoute allowedRoles={['student']}>
-                      <Layout>
-                        <JobApplications />
-                      </Layout>
-                    </ProtectedRoute>
-                  }
-                />
+              
                 <Route
                   path="/student/profile"
                   element={
                     <ProtectedRoute allowedRoles={['student']}>
                       <Layout>
                         <StudentProfile />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/student/grades"
+                  element={
+                    <ProtectedRoute allowedRoles={['student']}>
+                      <Layout>
+                        <GradesEntry />
                       </Layout>
                     </ProtectedRoute>
                   }

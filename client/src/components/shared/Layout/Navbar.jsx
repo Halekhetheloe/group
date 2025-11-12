@@ -81,8 +81,6 @@ const Navbar = () => {
       case 'student':
         return [
           ...baseItems,
-          { path: '/courses', label: 'Browse Courses' },
-          { path: '/jobs', label: 'Browse Jobs' },
           { path: '/student/applications', label: 'My Applications' },
           { path: '/student/transcripts', label: 'Transcripts' }
         ]

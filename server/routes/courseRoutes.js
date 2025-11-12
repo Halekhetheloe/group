@@ -6,7 +6,10 @@ import {
   updateCourse,
   deleteCourse,
   getCourseApplications,
-  checkCourseEligibility
+  checkCourseEligibility,
+  getEligibleCourses,
+  getRecommendedCourses,
+  getPopularCourses
 } from '../controllers/courseController.js';
 
 const router = express.Router();
@@ -48,8 +51,13 @@ const validateCourse = (req, res, next) => {
 
 // Public routes
 router.get('/', getCourses);
+router.get('/popular', getPopularCourses);
 router.get('/:id', getCourseById);
 router.post('/:id/check-eligibility', checkCourseEligibility);
+
+// Student-specific routes
+router.get('/student/:studentId/eligible', getEligibleCourses);
+router.get('/student/:studentId/recommended', getRecommendedCourses);
 
 // Protected routes
 router.use(authenticateToken);

@@ -7,7 +7,11 @@ import {
   getInstitutionCourses,
   createCourse,
   updateCourse,
-  getInstitutionApplications
+  getInstitutionApplications,
+  getCourseEligibilityStats,
+  getEligibleStudents,
+  updateCourseRequirements,
+  getInstitutionDashboard
 } from '../controllers/institutionController.js';
 
 const router = express.Router();
@@ -57,6 +61,11 @@ router.get('/', getInstitutions);
 router.get('/:id', getInstitutionById);
 router.get('/:id/courses', getInstitutionCourses);
 
+// Institution dashboard and analytics routes
+router.get('/:id/dashboard', getInstitutionDashboard);
+router.get('/:id/courses/:courseId/eligibility-stats', getCourseEligibilityStats);
+router.get('/:id/courses/:courseId/eligible-students', getEligibleStudents);
+
 // Protected routes (require authentication)
 router.use(authenticateToken);
 
@@ -65,6 +74,7 @@ router.post('/', requireAdminOrInstitution, validateInstitution, createInstituti
 router.put('/:id', requireAdminOrInstitution, validateInstitution, updateInstitution);
 router.post('/:id/courses', requireAdminOrInstitution, validateCourse, createCourse);
 router.put('/:id/courses/:courseId', requireAdminOrInstitution, validateCourse, updateCourse);
+router.put('/:id/courses/:courseId/requirements', requireAdminOrInstitution, updateCourseRequirements);
 router.get('/:id/applications', requireAdminOrInstitution, getInstitutionApplications);
 
 // Test endpoint

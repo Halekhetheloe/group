@@ -274,6 +274,133 @@ export const matchingAlgorithms = {
       console.error('Error finding qualified students:', error);
       throw error;
     }
+  },
+
+  // Get eligible courses for student
+  getEligibleCourses: async (studentId, filters = {}) => {
+    try {
+      // Get student grades
+      const studentDoc = await db.collection(collections.USERS).doc(studentId).get();
+      if (!studentDoc.exists()) {
+        throw new Error('Student not found');
+      }
+
+      const studentData = studentDoc.data();
+      const studentGrades = studentData.grades || studentData.academicRecords;
+
+      if (!studentGrades) {
+        throw new Error('No grade information found for student');
+      }
+
+      // Get all active courses
+      let coursesQuery = db.collection(collections.COURSES)
+        .where('status', '==', 'active');
+
+      // Apply additional filters
+      if (filters.institutionId) {
+        coursesQuery = coursesQuery.where('institutionId', '==', filters.institutionId);
+      }
+
+      if (filters.facultyId) {
+        coursesQuery = coursesQuery.where('facultyId', '==', filters.facultyId);
+      }
+
+      const coursesSnapshot = await coursesQuery.get();
+      const courses = [];
+
+      for (const courseDoc of coursesSnapshot.docs) {
+        const course = {
+          id: courseDoc.id,
+          ...courseDoc.data()
+        };
+
+        // Check eligibility
+        const eligibility = matchingAlgorithms.calculateCourseEligibility(studentGrades, course.requirements || {});
+        
+        if (eligibility.isEligible) {
+          courses.push({
+            ...course,
+            eligibility
+          });
+        }
+      }
+
+      return courses;
+    } catch (error) {
+      console.error('Error getting eligible courses:', error);
+      throw error;
+    }
+  },
+
+  // Get course recommendations based on eligibility and preferences
+  getRecommendedCourses: async (studentId, limit = 10) => {
+    try {
+      // Get eligible courses first
+      const eligibleCourses = await matchingAlgorithms.getEligibleCourses(studentId);
+
+      if (eligibleCourses.length === 0) {
+        return [];
+      }
+
+      // Get student preferences
+      const studentDoc = await db.collection(collections.USERS).doc(studentId).get();
+      const studentData = studentDoc.data();
+
+      // Score courses based on preferences and popularity
+      const scoredCourses = await Promise.all(
+        eligibleCourses.map(async (course) => {
+          let score = 0;
+
+          // Base score for eligibility
+          score += 50;
+
+          // Boost for matching student interests
+          if (studentData?.interests) {
+            const courseTitle = course.name.toLowerCase();
+            const courseDescription = course.description.toLowerCase();
+            const matches = studentData.interests.filter(interest =>
+              courseTitle.includes(interest.toLowerCase()) ||
+              courseDescription.includes(interest.toLowerCase())
+            );
+            score += matches.length * 10;
+          }
+
+          // Boost for popular courses (application count)
+          const applicationsSnapshot = await db.collection(collections.APPLICATIONS)
+            .where('courseId', '==', course.id)
+            .get();
+          score += Math.min(applicationsSnapshot.size * 2, 20);
+
+          // Boost for institution reputation
+          if (course.institution?.accreditationStatus) {
+            score += 10;
+          }
+
+          // Boost for upcoming deadlines (urgency)
+          if (course.applicationDeadline) {
+            const deadlineDate = course.applicationDeadline.toDate ? course.applicationDeadline.toDate() : new Date(course.applicationDeadline);
+            const daysUntilDeadline = Math.ceil((deadlineDate - new Date()) / (1000 * 60 * 60 * 24));
+            if (daysUntilDeadline <= 30) {
+              score += 10;
+            }
+          }
+
+          return {
+            ...course,
+            recommendationScore: score
+          };
+        })
+      );
+
+      // Sort by recommendation score and limit
+      return scoredCourses
+        .sort((a, b) => b.recommendationScore - a.recommendationScore)
+        .slice(0, limit);
+
+    } catch (error) {
+      console.error('Error getting course recommendations:', error);
+      throw error;
+    }
   }
 };
 
@@ -419,6 +546,7 @@ const calculateAverageGPA = (transcripts) => {
   return totalGPA / transcripts.length;
 };
 
+// Check if job is accepting applications
 const isJobAcceptingApplications = (job) => {
   if (job.status !== 'active') {
     return false;
@@ -435,6 +563,8 @@ const isJobAcceptingApplications = (job) => {
 export const matchingUtils = {
   calculateJobMatch: matchingAlgorithms.calculateJobMatch,
   calculateCourseEligibility: matchingAlgorithms.calculateCourseEligibility,
+  getEligibleCourses: matchingAlgorithms.getEligibleCourses,
+  getRecommendedCourses: matchingAlgorithms.getRecommendedCourses,
   findSimilarJobs: matchingAlgorithms.findSimilarJobs,
   findQualifiedStudents: matchingAlgorithms.findQualifiedStudents,
   isJobAcceptingApplications

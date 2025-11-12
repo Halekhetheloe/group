@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, deleteDoc, orderBy } from 'firebase/firestore'
 import { db } from '../../firebase-config'
 import { useAuth } from '../../hooks/useAuth'
-import { Plus, Search, Filter, Edit, Trash2, BookOpen, Clock, Users, DollarSign, Save, X } from 'lucide-react'
+import { Plus, Search, Filter, Edit, Trash2, BookOpen, Clock, Users, DollarSign, Save, X, Target } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const CourseManagement = () => {
@@ -17,15 +17,20 @@ const CourseManagement = () => {
   const [editingCourse, setEditingCourse] = useState(null)
   const [formData, setFormData] = useState({
     name: '',
-    description: '',
     facultyId: '',
     duration: '',
     tuition: '',
-    requirements: [''],
+    requirements: {
+      minPoints: 60, // Minimum 60 points required
+      subjects: [],
+      certificates: ['High School Diploma']
+    },
     seats: '',
     applicationDeadline: ''
   })
   const [errors, setErrors] = useState({})
+
+  const subjectOptions = ['Mathematics', 'English', 'Science', 'Biology', 'Chemistry', 'Physics', 'History', 'Geography', 'Accounting', 'Economics']
 
   useEffect(() => {
     if (userData) {
@@ -79,8 +84,7 @@ const CourseManagement = () => {
     // Search filter
     if (searchTerm) {
       filtered = filtered.filter(course =>
-        course.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        course.description.toLowerCase().includes(searchTerm.toLowerCase())
+        course.name.toLowerCase().includes(searchTerm.toLowerCase())
       )
     }
 
@@ -97,10 +101,6 @@ const CourseManagement = () => {
     
     if (!formData.name.trim()) {
       newErrors.name = 'Course name is required'
-    }
-    
-    if (!formData.description.trim()) {
-      newErrors.description = 'Description is required'
     }
     
     if (!formData.facultyId) {
@@ -125,10 +125,9 @@ const CourseManagement = () => {
       newErrors.applicationDeadline = 'Deadline must be in the future'
     }
     
-    // Validate requirements
-    const validRequirements = formData.requirements.filter(req => req.trim())
-    if (validRequirements.length === 0) {
-      newErrors.requirements = 'At least one requirement is needed'
+    // Validate minimum points
+    if (!formData.requirements.minPoints || formData.requirements.minPoints < 60) {
+      newErrors.minPoints = 'Minimum points must be at least 60'
     }
     
     setErrors(newErrors)
@@ -145,16 +144,15 @@ const CourseManagement = () => {
       
       const courseData = {
         name: formData.name.trim(),
-        description: formData.description.trim(),
         facultyId: formData.facultyId,
         facultyName: faculty?.name,
         duration: formData.duration.trim(),
         tuition: formData.tuition.trim(),
-        requirements: formData.requirements.filter(req => req.trim()),
+        requirements: formData.requirements,
         seats: parseInt(formData.seats),
         applicationDeadline: new Date(formData.applicationDeadline),
         institutionId: userData.uid,
-        institutionName: userData.displayName || userData.name || 'Your Institution', // FIXED: Use available fields
+        institutionName: userData.displayName || userData.name || 'Your Institution',
         status: 'active',
         createdAt: new Date(),
         updatedAt: new Date()
@@ -184,11 +182,14 @@ const CourseManagement = () => {
     setEditingCourse(course)
     setFormData({
       name: course.name,
-      description: course.description,
       facultyId: course.facultyId,
       duration: course.duration,
       tuition: course.tuition,
-      requirements: course.requirements.length > 0 ? course.requirements : [''],
+      requirements: course.requirements || {
+        minPoints: 60,
+        subjects: [],
+        certificates: ['High School Diploma']
+      },
       seats: course.seats.toString(),
       applicationDeadline: course.applicationDeadline?.toDate?.().toISOString().split('T')[0] || ''
     })
@@ -225,11 +226,14 @@ const CourseManagement = () => {
   const handleCancel = () => {
     setFormData({
       name: '',
-      description: '',
       facultyId: '',
       duration: '',
       tuition: '',
-      requirements: [''],
+      requirements: {
+        minPoints: 60,
+        subjects: [],
+        certificates: ['High School Diploma']
+      },
       seats: '',
       applicationDeadline: ''
     })
@@ -249,27 +253,29 @@ const CourseManagement = () => {
     }
   }
 
-  const handleRequirementChange = (index, value) => {
+  const handleRequirementChange = (field, value) => {
     setFormData(prev => ({
       ...prev,
-      requirements: prev.requirements.map((req, i) => i === index ? value : req)
+      requirements: {
+        ...prev.requirements,
+        [field]: value
+      }
     }))
   }
 
-  const addRequirement = () => {
+  const handleSubjectToggle = (subject) => {
+    const currentSubjects = formData.requirements.subjects
+    const newSubjects = currentSubjects.includes(subject)
+      ? currentSubjects.filter(s => s !== subject)
+      : [...currentSubjects, subject]
+    
     setFormData(prev => ({
       ...prev,
-      requirements: [...prev.requirements, '']
+      requirements: {
+        ...prev.requirements,
+        subjects: newSubjects
+      }
     }))
-  }
-
-  const removeRequirement = (index) => {
-    if (formData.requirements.length > 1) {
-      setFormData(prev => ({
-        ...prev,
-        requirements: prev.requirements.filter((_, i) => i !== index)
-      }))
-    }
   }
 
   const getFacultyName = (facultyId) => {
@@ -309,7 +315,7 @@ const CourseManagement = () => {
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Course Management</h1>
             <p className="text-gray-600 mt-2">
-              Manage academic courses and programs
+              Manage academic courses and programs (Minimum 60 points required)
             </p>
           </div>
           <button
@@ -468,7 +474,7 @@ const CourseManagement = () => {
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Users className="h-5 w-5 text-gray-400" />
+                      <Users className="h-5 w-5 mr-3 text-gray-400" />
                     </div>
                     <input
                       id="seats"
@@ -504,60 +510,52 @@ const CourseManagement = () => {
                   {errors.applicationDeadline && <p className="text-sm text-red-600 mt-1">{errors.applicationDeadline}</p>}
                 </div>
 
-                {/* Description */}
+                {/* Minimum Points Requirement */}
                 <div className="md:col-span-2 space-y-2">
-                  <label htmlFor="description" className="block text-sm font-medium text-gray-700">
-                    Course Description *
+                  <label htmlFor="minPoints" className="block text-sm font-medium text-gray-700">
+                    Minimum Points Required *
                   </label>
-                  <textarea
-                    id="description"
-                    name="description"
-                    rows={4}
-                    value={formData.description}
-                    onChange={handleChange}
-                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 resize-none ${
-                      errors.description ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-300'
-                    }`}
-                    placeholder="Describe the course, curriculum, career opportunities..."
-                  />
-                  {errors.description && <p className="text-sm text-red-600 mt-1">{errors.description}</p>}
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Target className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <input
+                      id="minPoints"
+                      name="minPoints"
+                      type="number"
+                      min="60"
+                      max="100"
+                      value={formData.requirements.minPoints}
+                      onChange={(e) => handleRequirementChange('minPoints', parseInt(e.target.value))}
+                      className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 ${
+                        errors.minPoints ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-300'
+                      }`}
+                      placeholder="Minimum 60 points required"
+                    />
+                  </div>
+                  {errors.minPoints && <p className="text-sm text-red-600 mt-1">{errors.minPoints}</p>}
+                  <p className="text-xs text-gray-500 mt-1">
+                    Students with less than {formData.requirements.minPoints} points will not see this course
+                  </p>
                 </div>
 
-                {/* Requirements */}
+                {/* Required Subjects */}
                 <div className="md:col-span-2 space-y-2">
                   <label className="block text-sm font-medium text-gray-700">
-                    Admission Requirements *
+                    Required Subjects
                   </label>
-                  <div className="space-y-3">
-                    {formData.requirements.map((requirement, index) => (
-                      <div key={index} className="flex items-center space-x-3">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {subjectOptions.map(subject => (
+                      <label key={subject} className="flex items-center space-x-2 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
                         <input
-                          type="text"
-                          value={requirement}
-                          onChange={(e) => handleRequirementChange(index, e.target.value)}
-                          className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
-                          placeholder={`Requirement ${index + 1} (e.g., High School Diploma, Minimum GPA...)`}
+                          type="checkbox"
+                          checked={formData.requirements.subjects.includes(subject)}
+                          onChange={() => handleSubjectToggle(subject)}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                         />
-                        {formData.requirements.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => removeRequirement(index)}
-                            className="p-3 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all duration-200"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
+                        <span className="text-sm text-gray-700">{subject}</span>
+                      </label>
                     ))}
-                    <button
-                      type="button"
-                      onClick={addRequirement}
-                      className="flex items-center text-blue-600 hover:text-blue-700 font-medium transition-colors duration-200"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Requirement
-                    </button>
-                    {errors.requirements && <p className="text-sm text-red-600 mt-1">{errors.requirements}</p>}
                   </div>
                 </div>
               </div>
@@ -623,10 +621,6 @@ const CourseManagement = () => {
                     </div>
                   </div>
 
-                  <p className="text-gray-600 mb-6 line-clamp-2">
-                    {course.description}
-                  </p>
-
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-sm mb-4">
                     <div className="flex items-center text-gray-600">
                       <Clock className="h-5 w-5 mr-3 text-blue-500" />
@@ -650,10 +644,10 @@ const CourseManagement = () => {
                       </div>
                     </div>
                     <div className="flex items-center text-gray-600">
-                      <BookOpen className="h-5 w-5 mr-3 text-orange-500" />
+                      <Target className="h-5 w-5 mr-3 text-orange-500" />
                       <div>
-                        <div className="font-medium">Deadline</div>
-                        <div>{formatDate(course.applicationDeadline)}</div>
+                        <div className="font-medium">Min Points</div>
+                        <div>{course.requirements?.minPoints || 60}</div>
                       </div>
                     </div>
                   </div>
@@ -661,16 +655,20 @@ const CourseManagement = () => {
                   {/* Requirements Preview */}
                   <div className="mt-6 pt-6 border-t border-gray-200">
                     <h4 className="text-sm font-medium text-gray-900 mb-3">Admission Requirements:</h4>
-                    <div className="flex flex-wrap gap-2">
-                      {course.requirements.slice(0, 3).map((requirement, index) => (
-                        <span key={index} className="inline-block bg-blue-50 text-blue-700 text-sm px-3 py-1 rounded-lg border border-blue-100">
-                          {requirement}
-                        </span>
-                      ))}
-                      {course.requirements.length > 3 && (
-                        <span className="inline-block bg-gray-50 text-gray-700 text-sm px-3 py-1 rounded-lg border border-gray-200">
-                          +{course.requirements.length - 3} more
-                        </span>
+                    <div className="space-y-2">
+                      <div className="flex items-center text-sm text-gray-700">
+                        <Target className="h-4 w-4 mr-2 text-orange-500" />
+                        Minimum {course.requirements?.minPoints || 60} points required
+                      </div>
+                      {course.requirements?.subjects && course.requirements.subjects.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          <span className="text-sm font-medium text-gray-700">Required Subjects:</span>
+                          {course.requirements.subjects.map((subject, index) => (
+                            <span key={index} className="inline-block bg-blue-50 text-blue-700 text-sm px-3 py-1 rounded-lg border border-blue-100">
+                              {subject}
+                            </span>
+                          ))}
+                        </div>
                       )}
                     </div>
                   </div>

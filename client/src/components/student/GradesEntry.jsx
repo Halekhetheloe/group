@@ -2,11 +2,9 @@ import React, { useState, useEffect } from 'react'
 import { collection, query, getDocs, where, orderBy, doc, getDoc, addDoc } from 'firebase/firestore'
 import { db } from '../../firebase-config'
 import { useAuth } from '../../hooks/useAuth'
-import { useNavigate } from 'react-router-dom'
 
 const CourseBrowser = () => {
   const { userData } = useAuth()
-  const navigate = useNavigate()
   const [courses, setCourses] = useState([])
   const [filteredCourses, setFilteredCourses] = useState([])
   const [institutions, setInstitutions] = useState([])
@@ -19,6 +17,7 @@ const CourseBrowser = () => {
   const [appliedCourses, setAppliedCourses] = useState(new Set())
   const [studentGrades, setStudentGrades] = useState(null)
   const [eligibilityChecked, setEligibilityChecked] = useState(false)
+  const [noQualifiedCourses, setNoQualifiedCourses] = useState(false)
 
   // CSS Styles
   const styles = {
@@ -32,17 +31,23 @@ const CourseBrowser = () => {
     selectField: "px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white text-slate-900 min-w-[150px]",
     btnPrimary: "bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 rounded-xl font-semibold shadow-sm hover:shadow-md transition-all duration-200 transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none",
     btnSecondary: "bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white px-6 py-3 rounded-xl font-semibold shadow-sm hover:shadow-md transition-all duration-200 transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none",
+    btnOutline: "border-2 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white px-6 py-3 rounded-xl font-semibold transition-all duration-200 transform hover:-translate-y-0.5",
     courseTitle: "text-xl font-bold text-slate-800 group-hover:text-blue-600 transition-colors duration-200",
     institutionName: "text-sm text-slate-600 mt-1",
     courseDescription: "text-sm text-slate-600 mb-4 line-clamp-3",
     detailText: "text-sm text-slate-600 flex items-center",
+    requirementBadge: "inline-block bg-slate-100 text-slate-700 text-xs px-2 py-1 rounded-lg border border-slate-200",
+    moreBadge: "inline-block bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-lg border border-blue-200",
     deadlinePassed: "bg-red-50 border border-red-200 text-red-700",
     deadlineActive: "bg-blue-50 border border-blue-200 text-blue-700",
     warningText: "text-xs text-red-600 mt-1",
     grid: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6",
     flexBetween: "flex items-center justify-between",
+    flexCenter: "flex items-center justify-center",
     iconButton: "p-1 text-slate-400 hover:text-blue-500 rounded transition-colors duration-200",
+    icon: "h-4 w-4 mr-2",
     emptyState: "text-center py-12",
+    emptyIcon: "mx-auto h-12 w-12 text-slate-400 mb-4",
     emptyTitle: "text-lg font-semibold text-slate-800 mb-2",
     emptyText: "text-slate-600 mb-6",
     loadingPulse: "animate-pulse",
@@ -70,25 +75,14 @@ const CourseBrowser = () => {
     try {
       if (!userData) return
       
-      console.log('🔍 Fetching student grades for:', userData.uid)
       const studentDoc = await getDoc(doc(db, 'students', userData.uid))
-      
       if (studentDoc.exists()) {
         const studentData = studentDoc.data()
-        console.log('📊 Student data found:', studentData)
-        
-        // Handle different grade data structures
-        const grades = studentData.grades || studentData.academicRecords
-        console.log('🎯 Student grades:', grades)
-        
-        setStudentGrades(grades || null)
-      } else {
-        console.log('❌ No student document found')
-        setStudentGrades(null)
+        setStudentGrades(studentData.grades || studentData.academicRecords || null)
       }
       setEligibilityChecked(true)
     } catch (error) {
-      console.error('❌ Error fetching student grades:', error)
+      console.error('Error fetching student grades:', error)
       setEligibilityChecked(true)
     }
   }
@@ -96,97 +90,27 @@ const CourseBrowser = () => {
   const fetchData = async () => {
     try {
       setLoading(true)
-      console.log('📚 Starting to fetch courses...')
       
-      // Try different query approaches to find courses
-      let coursesData = []
-
-      // Approach 1: Try to get all courses without status filter first
-      try {
-        console.log('🔄 Trying to fetch all courses...')
-        const coursesQuery = query(
-          collection(db, 'courses'),
-          orderBy('createdAt', 'desc')
-        )
-        const coursesSnapshot = await getDocs(coursesQuery)
-        coursesData = coursesSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }))
-        console.log(`✅ Found ${coursesData.length} courses without status filter`)
-      } catch (error) {
-        console.log('❌ Error fetching without status filter:', error)
-        
-        // Approach 2: Try with status filter
-        try {
-          console.log('🔄 Trying with status filter...')
-          const coursesQuery = query(
-            collection(db, 'courses'),
-            where('status', '==', 'active'),
-            orderBy('createdAt', 'desc')
-          )
-          const coursesSnapshot = await getDocs(coursesQuery)
-          coursesData = coursesSnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          }))
-          console.log(`✅ Found ${coursesData.length} courses with status filter`)
-        } catch (statusError) {
-          console.log('❌ Error with status filter:', statusError)
-          
-          // Approach 3: Try simplest query - just get all documents
-          try {
-            console.log('🔄 Trying simplest query...')
-            const coursesSnapshot = await getDocs(collection(db, 'courses'))
-            coursesData = coursesSnapshot.docs.map(doc => ({
-              id: doc.id,
-              ...doc.data()
-            }))
-            console.log(`✅ Found ${coursesData.length} courses with simple query`)
-          } catch (simpleError) {
-            console.log('❌ Error with simple query:', simpleError)
-            coursesData = []
-          }
-        }
-      }
-
-      console.log('📋 Final courses data:', coursesData)
-
-      if (coursesData.length === 0) {
-        console.log('⚠️ No courses found in database. Possible issues:')
-        console.log('1. No courses have been created yet')
-        console.log('2. Firestore security rules are blocking access')
-        console.log('3. Collection name might be different')
-        console.log('4. Database connection issue')
-      }
+      // Fetch all active courses
+      const coursesQuery = query(
+        collection(db, 'courses'),
+        where('status', '==', 'active'),
+        orderBy('createdAt', 'desc')
+      )
+      const coursesSnapshot = await getDocs(coursesQuery)
+      const coursesData = coursesSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }))
 
       // Fetch institution details for each course
       const coursesWithInstitutions = await Promise.all(
         coursesData.map(async (course) => {
-          try {
-            if (!course.institutionId) {
-              console.log('⚠️ Course missing institutionId:', course.id)
-              return {
-                ...course,
-                institution: { name: 'Unknown Institution', location: 'Unknown' }
-              }
-            }
-
-            const institutionDoc = await getDoc(doc(db, 'institutions', course.institutionId))
-            const institutionData = institutionDoc.exists() ? institutionDoc.data() : { 
-              name: 'Unknown Institution', 
-              location: 'Unknown' 
-            }
-            return {
-              ...course,
-              institution: institutionData
-            }
-          } catch (error) {
-            console.error('❌ Error fetching institution:', error)
-            return {
-              ...course,
-              institution: { name: 'Unknown Institution', location: 'Unknown' }
-            }
+          const institutionDoc = await getDoc(doc(db, 'institutions', course.institutionId))
+          const institutionData = institutionDoc.exists() ? institutionDoc.data() : { name: 'Unknown Institution', location: 'Unknown' }
+          return {
+            ...course,
+            institution: institutionData
           }
         })
       )
@@ -194,27 +118,20 @@ const CourseBrowser = () => {
       setCourses(coursesWithInstitutions)
 
       // Get unique institutions for filter
-      const uniqueInstitutions = [...new Set(coursesData.map(course => course.institutionId).filter(Boolean))]
-      console.log('🏫 Unique institutions:', uniqueInstitutions)
-      
+      const uniqueInstitutions = [...new Set(coursesData.map(course => course.institutionId))]
       const institutionDetails = await Promise.all(
         uniqueInstitutions.map(async (id) => {
-          try {
-            const institutionDoc = await getDoc(doc(db, 'institutions', id))
-            return {
-              id,
-              ...institutionDoc.data()
-            }
-          } catch (error) {
-            console.error('❌ Error fetching institution details:', error)
-            return { id, name: 'Unknown Institution' }
+          const institutionDoc = await getDoc(doc(db, 'institutions', id))
+          return {
+            id,
+            ...institutionDoc.data()
           }
         })
       )
       setInstitutions(institutionDetails)
 
     } catch (error) {
-      console.error('❌ Error in fetchData:', error)
+      console.error('Error fetching data:', error)
     } finally {
       setLoading(false)
     }
@@ -222,8 +139,6 @@ const CourseBrowser = () => {
 
   const fetchAppliedCourses = async () => {
     try {
-      if (!userData) return
-      
       const applicationsQuery = query(
         collection(db, 'applications'),
         where('studentId', '==', userData.uid)
@@ -237,19 +152,7 @@ const CourseBrowser = () => {
   }
 
   const checkCourseEligibility = (course, grades) => {
-    console.log('🎯 Checking eligibility for course:', course.name)
-    console.log('📊 Course requirements:', course.requirements)
-    console.log('📈 Student grades:', grades)
-
-    if (!course.requirements) {
-      console.log('✅ No requirements - course is eligible')
-      return { 
-        eligible: true, 
-        reason: 'No requirements specified',
-        missingRequirements: [],
-        meetsRequirements: ['No specific requirements']
-      }
-    }
+    if (!course.requirements) return { eligible: true, reason: 'No requirements specified' }
     
     const requirements = course.requirements
     const eligibility = {
@@ -258,43 +161,20 @@ const CourseBrowser = () => {
       meetsRequirements: []
     }
 
-    // Check minimum points (this is the main requirement)
-    if (requirements.minPoints) {
-      const studentPoints = grades?.points || 0
-      console.log(`📊 Points check: Student ${studentPoints} vs Required ${requirements.minPoints}`)
-      
-      if (studentPoints < requirements.minPoints) {
-        eligibility.eligible = false
-        eligibility.missingRequirements.push(`Minimum ${requirements.minPoints} points required (your points: ${studentPoints})`)
-        console.log('❌ Points requirement not met')
-      } else {
-        eligibility.meetsRequirements.push(`Meets points requirement (${requirements.minPoints})`)
-        console.log('✅ Points requirement met')
-      }
-    } else {
-      console.log('ℹ️ No points requirement specified')
-      // If no points requirement, course is eligible
-      eligibility.meetsRequirements.push('No minimum points requirement')
-    }
-
-    // Check minimum grade requirement (if specified)
+    // Check minimum grade requirement
     if (requirements.minGrade) {
       const gradeOrder = { 'A': 5, 'B': 4, 'C': 3, 'D': 2, 'E': 1, 'F': 0 }
       const studentOverallGrade = grades?.overall || 'F'
       
-      console.log(`📊 Grade check: Student ${studentOverallGrade} vs Required ${requirements.minGrade}`)
-      
       if (gradeOrder[studentOverallGrade] < gradeOrder[requirements.minGrade]) {
         eligibility.eligible = false
         eligibility.missingRequirements.push(`Minimum grade of ${requirements.minGrade} required (your grade: ${studentOverallGrade})`)
-        console.log('❌ Grade requirement not met')
       } else {
         eligibility.meetsRequirements.push(`Meets grade requirement (${requirements.minGrade})`)
-        console.log('✅ Grade requirement met')
       }
     }
 
-    // Check subject requirements (if specified)
+    // Check subject requirements
     if (requirements.subjects && requirements.subjects.length > 0) {
       const missingSubjects = requirements.subjects.filter(subject => 
         !grades?.subjects || !grades.subjects[subject]
@@ -303,47 +183,46 @@ const CourseBrowser = () => {
       if (missingSubjects.length > 0) {
         eligibility.eligible = false
         eligibility.missingRequirements.push(`Missing subjects: ${missingSubjects.join(', ')}`)
-        console.log('❌ Subject requirements not met')
       } else {
         eligibility.meetsRequirements.push('Meets all subject requirements')
-        console.log('✅ Subject requirements met')
       }
     }
 
-    console.log('🎯 Final eligibility:', eligibility.eligible)
+    // Check minimum points
+    if (requirements.minPoints) {
+      const studentPoints = grades?.points || 0
+      if (studentPoints < requirements.minPoints) {
+        eligibility.eligible = false
+        eligibility.missingRequirements.push(`Minimum ${requirements.minPoints} points required (your points: ${studentPoints})`)
+      } else {
+        eligibility.meetsRequirements.push(`Meets points requirement (${requirements.minPoints})`)
+      }
+    }
+
     return eligibility
   }
 
   const filterAndSortCourses = () => {
-    console.log('🔍 Starting course filtering...')
-    console.log('📚 Total courses:', courses.length)
-    console.log('📊 Student grades:', studentGrades)
-    console.log('✅ Eligibility checked:', eligibilityChecked)
-
     let filtered = courses
 
     // Apply grade-based filtering if student grades are available
     if (studentGrades && eligibilityChecked) {
-      console.log('🎯 Applying eligibility filtering...')
-      const beforeFilter = filtered.length
-      
       filtered = filtered.filter(course => {
         const eligibility = checkCourseEligibility(course, studentGrades)
         course.eligibility = eligibility // Attach eligibility info to course
         return eligibility.eligible
       })
-      
-      console.log(`📊 Filtered from ${beforeFilter} to ${filtered.length} courses`)
-    } else if (eligibilityChecked) {
-      console.log('ℹ️ No student grades available, showing all courses')
+
+      // NEW: Check if no courses are qualified
+      setNoQualifiedCourses(filtered.length === 0)
     }
 
     // Search filter
     if (searchTerm) {
       filtered = filtered.filter(course =>
         course.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (course.description && course.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (course.institution?.name && course.institution.name.toLowerCase().includes(searchTerm.toLowerCase()))
+        course.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        course.institution?.name?.toLowerCase().includes(searchTerm.toLowerCase())
       )
     }
 
@@ -390,7 +269,6 @@ const CourseBrowser = () => {
       }
     })
 
-    console.log('✅ Final filtered courses:', filtered.length)
     setFilteredCourses(filtered)
   }
 
@@ -470,44 +348,6 @@ const CourseBrowser = () => {
     )
   }
 
-  // Function to create sample courses for testing
-  const createSampleCourse = async () => {
-    if (!userData) {
-      alert('Please log in to create sample courses')
-      return
-    }
-
-    try {
-      const sampleCourse = {
-        name: 'Bachelor of Science in Computer Science',
-        facultyId: 'sample-faculty',
-        facultyName: 'Faculty of Science and Technology',
-        duration: '4 years',
-        tuition: 'M25,000 per year',
-        requirements: {
-          minPoints: 60,
-          minGrade: 'C',
-          subjects: ['Mathematics', 'English'],
-          certificates: ['High School Diploma']
-        },
-        seats: 50,
-        applicationDeadline: new Date('2024-12-31'),
-        institutionId: 'sample-institution',
-        institutionName: 'National University of Lesotho',
-        status: 'active',
-        createdAt: new Date(),
-        updatedAt: new Date()
-      }
-
-      await addDoc(collection(db, 'courses'), sampleCourse)
-      alert('Sample course created! Refreshing...')
-      fetchData() // Refresh the course list
-    } catch (error) {
-      console.error('Error creating sample course:', error)
-      alert('Failed to create sample course')
-    }
-  }
-
   if (loading) {
     return (
       <div className={styles.container}>
@@ -545,31 +385,12 @@ const CourseBrowser = () => {
                 <strong>Your Grades:</strong> Overall: {studentGrades.overall || 'Not specified'} | 
                 Points: {studentGrades.points || 'Not specified'}
               </p>
-              <p className="text-xs text-blue-600 mt-1">
-                Debug: {courses.length} total courses, {filteredCourses.length} filtered
-              </p>
             </div>
           )}
         </div>
 
-        {/* Create Sample Course Button (for testing) */}
-        {courses.length === 0 && userData && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-            <h3 className="text-lg font-semibold text-yellow-800 mb-2">No Courses Found</h3>
-            <p className="text-yellow-700 mb-4">
-              There are no courses in the database yet. You can create a sample course for testing.
-            </p>
-            <button
-              onClick={createSampleCourse}
-              className="bg-yellow-600 hover:bg-yellow-700 text-white px-6 py-3 rounded-lg font-semibold"
-            >
-              Create Sample Course
-            </button>
-          </div>
-        )}
-
-        {/* Filters and Search */}
-        {courses.length > 0 && (
+        {/* Filters and Search - Hide when no qualified courses */}
+        {!noQualifiedCourses && (
           <div className={styles.filterCard}>
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
               <div className="flex-1 max-w-md">
@@ -646,8 +467,62 @@ const CourseBrowser = () => {
           </div>
         )}
 
-        {/* Courses Grid */}
-        {courses.length > 0 && (
+        {/* NEW: No Qualified Courses Message */}
+        {noQualifiedCourses && studentGrades && (
+          <div className="bg-white rounded-2xl shadow-sm border border-red-200 p-8 text-center mb-6">
+            <div className="text-red-500 text-6xl mb-4">🎓</div>
+            <h2 className="text-2xl font-bold text-red-800 mb-4">
+              You Don't Qualify for Any Courses
+            </h2>
+            <p className="text-red-700 mb-6 max-w-2xl mx-auto">
+              Based on your current grades, you don't meet the requirements for any available courses. 
+              Don't worry! Here are some suggestions to improve your chances:
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 max-w-4xl mx-auto">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-left">
+                <h3 className="font-semibold text-red-800 mb-2">📚 Improve Your Grades</h3>
+                <p className="text-red-700 text-sm">
+                  Consider retaking subjects or improving your overall performance
+                </p>
+              </div>
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-left">
+                <h3 className="font-semibold text-red-800 mb-2">🎯 Explore Alternative Paths</h3>
+                <p className="text-red-700 text-sm">
+                  Look for bridging programs or foundation courses with lower requirements
+                </p>
+              </div>
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-left">
+                <h3 className="font-semibold text-red-800 mb-2">💼 Consider Vocational Training</h3>
+                <p className="text-red-700 text-sm">
+                  Explore skills-based programs that may have different entry requirements
+                </p>
+              </div>
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-left">
+                <h3 className="font-semibold text-red-800 mb-2">📞 Contact Institutions</h3>
+                <p className="text-red-700 text-sm">
+                  Some institutions offer special consideration or alternative entry pathways
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <button
+                onClick={() => navigate('/student/grades')}
+                className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+              >
+                Update Your Grades
+              </button>
+              <button
+                onClick={() => navigate('/student/dashboard')}
+                className="border border-red-600 text-red-600 hover:bg-red-50 px-6 py-3 rounded-lg font-semibold transition-colors"
+              >
+                Back to Dashboard
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Courses Grid - Only show when there are qualified courses */}
+        {!noQualifiedCourses && filteredCourses.length > 0 && (
           <div className={styles.grid}>
             {filteredCourses.map((course) => {
               const hasApplied = appliedCourses.has(course.id)
@@ -676,7 +551,20 @@ const CourseBrowser = () => {
                       </h3>
                       <p className={styles.institutionName}>{course.institution?.name}</p>
                     </div>
+                    <div className="flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                      <button className={styles.iconButton}>
+                        <div className="h-4 w-4 bg-red-400 rounded"></div>
+                      </button>
+                      <button className={styles.iconButton}>
+                        <div className="h-4 w-4 bg-blue-400 rounded"></div>
+                      </button>
+                    </div>
                   </div>
+
+                  {/* Course Description */}
+                  <p className={styles.courseDescription}>
+                    {course.description}
+                  </p>
 
                   {/* Course Details */}
                   <div className="space-y-3 mb-4">
@@ -737,6 +625,10 @@ const CourseBrowser = () => {
 
                   {/* Action Buttons */}
                   <div className="flex space-x-2">
+                    <button className={styles.btnSecondary}>
+                      <div className="h-4 w-4 bg-white rounded mr-1"></div>
+                      View Details
+                    </button>
                     <button
                       onClick={() => applyForCourse(course.id)}
                       disabled={hasApplied || deadlinePassed || !userData || (course.eligibility && !course.eligibility.eligible)}
@@ -770,32 +662,19 @@ const CourseBrowser = () => {
           </div>
         )}
 
-        {/* Empty State */}
-        {filteredCourses.length === 0 && courses.length > 0 && (
+        {/* Empty State - Only show when there are no qualified courses but student has grades */}
+        {!noQualifiedCourses && filteredCourses.length === 0 && studentGrades && (
           <div className={styles.emptyState}>
-            <div className="text-6xl mb-4">📚</div>
-            <h3 className={styles.emptyTitle}>
-              {studentGrades ? 'No courses match your qualifications' : 'No courses found'}
-            </h3>
+            <div className={styles.emptyIcon}></div>
+            <h3 className={styles.emptyTitle}>No courses found</h3>
             <p className={styles.emptyText}>
-              {studentGrades 
-                ? 'Try updating your profile with better grades or explore different filters.'
-                : 'Try adjusting your search terms or filters.'
-              }
+              Try adjusting your search terms or filters to find more courses.
             </p>
-            {studentGrades && (
-              <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-                <p className="text-sm text-blue-800">
-                  <strong>Debug Info:</strong> You have {studentGrades.points || 0} points. 
-                  There are {courses.length} total courses but none match your current qualifications.
-                </p>
-              </div>
-            )}
           </div>
         )}
 
         {/* Results Count */}
-        {filteredCourses.length > 0 && (
+        {!noQualifiedCourses && filteredCourses.length > 0 && (
           <div className="mt-6 text-center">
             <p className="text-sm text-slate-600">
               Showing {filteredCourses.length} of {courses.length} courses

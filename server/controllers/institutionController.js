@@ -1,7 +1,8 @@
 import { db } from '../config/firebase-admin.js';
 import { collections } from '../config/database.js';
-import { validateInstitution, validateCourse } from '../validators/institutionValidators.js';
+import { matchingUtils } from '../utils/matchingUtils.js';
 
+// Institution Controller
 export const getInstitutions = async (req, res) => {
   try {
     res.json({
@@ -90,17 +91,8 @@ export const getInstitutionById = async (req, res) => {
 
 export const createInstitution = async (req, res) => {
   try {
-    const { error, value } = validateInstitution(req.body);
-    if (error) {
-      return res.status(400).json({
-        success: false,
-        error: 'VALIDATION_ERROR',
-        message: error.details[0].message
-      });
-    }
-
     const institutionData = {
-      ...value,
+      ...req.body,
       id: 'inst-' + Date.now(),
       status: 'active',
       createdAt: new Date(),
@@ -126,24 +118,10 @@ export const updateInstitution = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const { error, value } = validateInstitution(req.body, true);
-    if (error) {
-      return res.status(400).json({
-        success: false,
-        error: 'VALIDATION_ERROR',
-        message: error.details[0].message
-      });
-    }
-
-    const updateData = {
-      ...value,
-      updatedAt: new Date()
-    };
-
     res.json({
       success: true,
       message: 'Institution updated successfully',
-      institution: { id, ...updateData }
+      institution: { id, ...req.body }
     });
   } catch (error) {
     console.error('Update institution error:', error);
@@ -170,7 +148,9 @@ export const getInstitutionCourses = async (req, res) => {
           description: 'Diploma in Information Technology',
           requirements: {
             minGrade: 'C',
-            subjects: ['Mathematics', 'English']
+            minPoints: 30,
+            subjects: ['Mathematics', 'English'],
+            certificates: ['High School Diploma']
           }
         }
       ],
@@ -195,17 +175,8 @@ export const createCourse = async (req, res) => {
   try {
     const { id: institutionId } = req.params;
 
-    const { error, value } = validateCourse(req.body);
-    if (error) {
-      return res.status(400).json({
-        success: false,
-        error: 'VALIDATION_ERROR',
-        message: error.details[0].message
-      });
-    }
-
     const courseData = {
-      ...value,
+      ...req.body,
       id: 'course-' + Date.now(),
       institutionId,
       status: 'active',
@@ -232,19 +203,10 @@ export const updateCourse = async (req, res) => {
   try {
     const { courseId } = req.params;
 
-    const { error, value } = validateCourse(req.body, true);
-    if (error) {
-      return res.status(400).json({
-        success: false,
-        error: 'VALIDATION_ERROR',
-        message: error.details[0].message
-      });
-    }
-
     res.json({
       success: true,
       message: 'Course updated successfully',
-      course: { id: courseId, ...value }
+      course: { id: courseId, ...req.body }
     });
   } catch (error) {
     console.error('Update course error:', error);
@@ -276,6 +238,238 @@ export const getInstitutionApplications = async (req, res) => {
       success: false,
       error: 'APPLICATIONS_FETCH_FAILED',
       message: 'Failed to fetch institution applications'
+    });
+  }
+};
+
+// New functions for grade-based matching
+export const getCourseEligibilityStats = async (req, res) => {
+  try {
+    const { courseId } = req.params;
+
+    // Mock data - in real implementation, fetch from database
+    const stats = {
+      totalStudents: 1000,
+      eligibleStudents: 450,
+      eligibilityPercentage: 45,
+      eligibilityBreakdown: {
+        byGrade: {
+          'A': 150,
+          'B': 200,
+          'C': 100,
+          'D': 50,
+          'E': 30,
+          'F': 20
+        },
+        byPoints: {
+          below: 300,
+          meets: 250,
+          exceeds: 200
+        }
+      }
+    };
+
+    res.json({
+      success: true,
+      stats,
+      course: {
+        id: courseId,
+        name: 'Sample Course',
+        requirements: {
+          minGrade: 'C',
+          minPoints: 30,
+          subjects: ['Mathematics', 'English']
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Get course eligibility stats error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'STATS_FETCH_FAILED',
+      message: 'Failed to fetch course eligibility statistics'
+    });
+  }
+};
+
+export const getEligibleStudents = async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    const { page = 1, limit = 20 } = req.query;
+
+    // Mock data - in real implementation, fetch from database
+    const eligibleStudents = [
+      {
+        id: 'student-001',
+        firstName: 'John',
+        lastName: 'Doe',
+        email: 'john.doe@student.ls',
+        grades: {
+          overall: 'A',
+          points: 85,
+          subjects: {
+            'Mathematics': 'A',
+            'English': 'B',
+            'Science': 'A'
+          }
+        },
+        eligibility: {
+          eligible: true,
+          meetsRequirements: ['Meets grade requirement (C)', 'Meets all subject requirements']
+        },
+        matchScore: 95
+      },
+      {
+        id: 'student-002',
+        firstName: 'Jane',
+        lastName: 'Smith',
+        email: 'jane.smith@student.ls',
+        grades: {
+          overall: 'B',
+          points: 65,
+          subjects: {
+            'Mathematics': 'B',
+            'English': 'B',
+            'Science': 'C'
+          }
+        },
+        eligibility: {
+          eligible: true,
+          meetsRequirements: ['Meets grade requirement (C)', 'Meets all subject requirements']
+        },
+        matchScore: 88
+      }
+    ];
+
+    res.json({
+      success: true,
+      eligibleStudents,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: eligibleStudents.length,
+        totalStudents: 450
+      },
+      course: {
+        id: courseId,
+        name: 'Sample Course'
+      }
+    });
+  } catch (error) {
+    console.error('Get eligible students error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'ELIGIBLE_STUDENTS_FETCH_FAILED',
+      message: 'Failed to fetch eligible students'
+    });
+  }
+};
+
+export const updateCourseRequirements = async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    const { requirements } = req.body;
+
+    // Validate requirements
+    const validationErrors = validateRequirements(requirements);
+    if (validationErrors.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'INVALID_REQUIREMENTS',
+        message: 'Invalid requirements provided',
+        errors: validationErrors
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Course requirements updated successfully',
+      course: {
+        id: courseId,
+        name: 'Sample Course',
+        requirements
+      },
+      stats: {
+        totalStudents: 1000,
+        eligibleStudents: 450,
+        eligibilityPercentage: 45
+      }
+    });
+  } catch (error) {
+    console.error('Update course requirements error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'REQUIREMENTS_UPDATE_FAILED',
+      message: 'Failed to update course requirements'
+    });
+  }
+};
+
+// Helper function to validate requirements
+const validateRequirements = (requirements) => {
+  const errors = [];
+
+  if (requirements.minGrade && !['A', 'B', 'C', 'D', 'E', 'F'].includes(requirements.minGrade)) {
+    errors.push('Minimum grade must be A, B, C, D, E, or F');
+  }
+
+  if (requirements.minPoints && (requirements.minPoints < 0 || requirements.minPoints > 100)) {
+    errors.push('Minimum points must be between 0 and 100');
+  }
+
+  if (requirements.subjects && !Array.isArray(requirements.subjects)) {
+    errors.push('Subjects must be an array');
+  }
+
+  return errors;
+};
+
+export const getInstitutionDashboard = async (req, res) => {
+  try {
+    const { id: institutionId } = req.params;
+
+    const dashboardData = {
+      totalCourses: 5,
+      totalApplications: 120,
+      pendingApplications: 45,
+      acceptedApplications: 60,
+      rejectedApplications: 15,
+      eligibleStudents: 450,
+      popularCourses: [
+        {
+          id: 'course-001',
+          name: 'Computer Science',
+          applications: 45,
+          eligibilityPercentage: 65
+        },
+        {
+          id: 'course-002',
+          name: 'Business Administration',
+          applications: 32,
+          eligibilityPercentage: 78
+        }
+      ],
+      recentApplications: [
+        {
+          id: 'app-001',
+          studentName: 'John Doe',
+          courseName: 'Computer Science',
+          appliedDate: new Date('2024-01-15'),
+          status: 'pending'
+        }
+      ]
+    };
+
+    res.json({
+      success: true,
+      dashboard: dashboardData
+    });
+  } catch (error) {
+    console.error('Get institution dashboard error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'DASHBOARD_FETCH_FAILED',
+      message: 'Failed to fetch institution dashboard'
     });
   }
 };

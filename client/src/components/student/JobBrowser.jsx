@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react'
-import { collection, query, where, getDocs, orderBy, doc, getDoc, addDoc } from 'firebase/firestore'
+import { collection, query, where, getDocs, orderBy, doc, getDoc, addDoc, deleteDoc } from 'firebase/firestore'
 import { db } from '../../firebase-config'
 import { useAuth } from '../../hooks/useAuth'
-import { Search, Filter, Briefcase, MapPin, Clock, DollarSign, Building, Heart, Share2, Eye, Users } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Search, Filter, Briefcase, MapPin, Clock, DollarSign, Building, Heart, Share2, Eye, Users, Target, GraduationCap, Award } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const JobBrowser = () => {
   const { userData } = useAuth()
+  const navigate = useNavigate()
   const [jobs, setJobs] = useState([])
   const [filteredJobs, setFilteredJobs] = useState([])
   const [companies, setCompanies] = useState([])
@@ -18,21 +20,24 @@ const JobBrowser = () => {
   const [sortBy, setSortBy] = useState('newest')
   const [appliedJobs, setAppliedJobs] = useState(new Set())
   const [savedJobs, setSavedJobs] = useState(new Set())
+  const [studentProfile, setStudentProfile] = useState(null)
+  const [qualificationChecked, setQualificationChecked] = useState(false)
 
   useEffect(() => {
     fetchData()
   }, [])
 
   useEffect(() => {
-    filterAndSortJobs()
-  }, [jobs, searchTerm, companyFilter, jobTypeFilter, experienceFilter, sortBy])
-
-  useEffect(() => {
     if (userData) {
+      fetchStudentProfile()
       fetchAppliedJobs()
       fetchSavedJobs()
     }
   }, [userData])
+
+  useEffect(() => {
+    filterAndSortJobs()
+  }, [jobs, searchTerm, companyFilter, jobTypeFilter, experienceFilter, sortBy, studentProfile])
 
   const fetchData = async () => {
     try {
@@ -50,14 +55,25 @@ const JobBrowser = () => {
         ...doc.data()
       }))
 
+      console.log('📋 Jobs found:', jobsData.length)
+      console.log('📋 Jobs data:', jobsData)
+
       // Fetch company details for each job
       const jobsWithCompanies = await Promise.all(
         jobsData.map(async (job) => {
-          const companyDoc = await getDoc(doc(db, 'companies', job.companyId))
-          const companyData = companyDoc.data()
-          return {
-            ...job,
-            company: companyData
+          try {
+            const companyDoc = await getDoc(doc(db, 'companies', job.companyId))
+            const companyData = companyDoc.exists() ? companyDoc.data() : { name: 'Unknown Company' }
+            return {
+              ...job,
+              company: companyData
+            }
+          } catch (error) {
+            console.error('Error fetching company:', error)
+            return {
+              ...job,
+              company: { name: 'Unknown Company' }
+            }
           }
         })
       )
@@ -68,10 +84,15 @@ const JobBrowser = () => {
       const uniqueCompanies = [...new Set(jobsData.map(job => job.companyId))]
       const companyDetails = await Promise.all(
         uniqueCompanies.map(async (id) => {
-          const companyDoc = await getDoc(doc(db, 'companies', id))
-          return {
-            id,
-            ...companyDoc.data()
+          try {
+            const companyDoc = await getDoc(doc(db, 'companies', id))
+            return {
+              id,
+              ...companyDoc.data()
+            }
+          } catch (error) {
+            console.error('Error fetching company details:', error)
+            return { id, name: 'Unknown Company' }
           }
         })
       )
@@ -81,6 +102,28 @@ const JobBrowser = () => {
       console.error('Error fetching data:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchStudentProfile = async () => {
+    try {
+      if (!userData) return
+      
+      console.log('🔍 Fetching student profile for:', userData.uid)
+      const studentDoc = await getDoc(doc(db, 'students', userData.uid))
+      
+      if (studentDoc.exists()) {
+        const profileData = studentDoc.data()
+        console.log('📊 Student profile found:', profileData)
+        setStudentProfile(profileData)
+      } else {
+        console.log('❌ No student profile found')
+        setStudentProfile(null)
+      }
+      setQualificationChecked(true)
+    } catch (error) {
+      console.error('❌ Error fetching student profile:', error)
+      setQualificationChecked(true)
     }
   }
 
@@ -112,8 +155,159 @@ const JobBrowser = () => {
     }
   }
 
+  const checkJobQualification = (job, profile) => {
+    console.log('🎯 Checking qualification for job:', job.title)
+    console.log('📊 Job requirements:', job.requirements)
+    console.log('👤 Student profile:', profile)
+
+    if (!job.requirements) {
+      console.log('✅ No requirements - job is accessible')
+      return { 
+        qualified: true, 
+        reason: 'No specific requirements',
+        missingQualifications: [],
+        meetsQualifications: ['No specific requirements specified']
+      }
+    }
+    
+    const requirements = job.requirements
+    const qualification = {
+      qualified: true,
+      missingQualifications: [],
+      meetsQualifications: []
+    }
+
+    // Check minimum education level
+    if (requirements.minEducation) {
+      const educationOrder = {
+        'high-school': 1,
+        'associate': 2,
+        'bachelor': 3,
+        'master': 4,
+        'phd': 5
+      }
+      
+      const studentEducation = profile?.educationLevel || 'high-school'
+      const requiredEducation = requirements.minEducation
+      
+      console.log(`📚 Education check: Student ${studentEducation} vs Required ${requiredEducation}`)
+      
+      if (educationOrder[studentEducation] < educationOrder[requiredEducation]) {
+        qualification.qualified = false
+        qualification.missingQualifications.push(`Minimum ${requiredEducation} degree required (your education: ${studentEducation})`)
+        console.log('❌ Education requirement not met')
+      } else {
+        qualification.meetsQualifications.push(`Meets education requirement (${requiredEducation})`)
+        console.log('✅ Education requirement met')
+      }
+    }
+
+    // Check minimum experience level
+    if (requirements.minExperience) {
+      const experienceOrder = {
+        'entry': 1,
+        'mid': 2,
+        'senior': 3,
+        'executive': 4
+      }
+      
+      const studentExperience = profile?.experienceLevel || 'entry'
+      const requiredExperience = requirements.minExperience
+      
+      console.log(`💼 Experience check: Student ${studentExperience} vs Required ${requiredExperience}`)
+      
+      if (experienceOrder[studentExperience] < experienceOrder[requiredExperience]) {
+        qualification.qualified = false
+        qualification.missingQualifications.push(`Minimum ${requiredExperience} level experience required`)
+        console.log('❌ Experience requirement not met')
+      } else {
+        qualification.meetsQualifications.push(`Meets experience requirement (${requiredExperience})`)
+        console.log('✅ Experience requirement met')
+      }
+    }
+
+    // Check required skills
+    if (requirements.requiredSkills && requirements.requiredSkills.length > 0) {
+      const studentSkills = profile?.skills || []
+      const missingSkills = requirements.requiredSkills.filter(skill => 
+        !studentSkills.some(studentSkill => 
+          studentSkill.toLowerCase().includes(skill.toLowerCase()) ||
+          skill.toLowerCase().includes(studentSkill.toLowerCase())
+        )
+      )
+
+      if (missingSkills.length > 0) {
+        qualification.qualified = false
+        qualification.missingQualifications.push(`Missing skills: ${missingSkills.join(', ')}`)
+        console.log('❌ Skills requirement not met')
+      } else {
+        qualification.meetsQualifications.push('Meets all skill requirements')
+        console.log('✅ Skills requirement met')
+      }
+    }
+
+    // Check minimum GPA/points if specified
+    if (requirements.minGPA) {
+      const studentGPA = profile?.gpa || profile?.grades?.points || 0
+      console.log(`📊 GPA check: Student ${studentGPA} vs Required ${requirements.minGPA}`)
+      
+      if (studentGPA < requirements.minGPA) {
+        qualification.qualified = false
+        qualification.missingQualifications.push(`Minimum GPA of ${requirements.minGPA} required (your GPA: ${studentGPA})`)
+        console.log('❌ GPA requirement not met')
+      } else {
+        qualification.meetsQualifications.push(`Meets GPA requirement (${requirements.minGPA})`)
+        console.log('✅ GPA requirement met')
+      }
+    }
+
+    // Check specific qualifications/certifications
+    if (requirements.qualifications && requirements.qualifications.length > 0) {
+      const studentQualifications = profile?.qualifications || []
+      const missingQualifications = requirements.qualifications.filter(qual => 
+        !studentQualifications.some(studentQual => 
+          studentQual.toLowerCase().includes(qual.toLowerCase()) ||
+          qual.toLowerCase().includes(studentQual.toLowerCase())
+        )
+      )
+
+      if (missingQualifications.length > 0) {
+        qualification.qualified = false
+        qualification.missingQualifications.push(`Missing qualifications: ${missingQualifications.join(', ')}`)
+        console.log('❌ Qualifications requirement not met')
+      } else {
+        qualification.meetsQualifications.push('Meets all qualification requirements')
+        console.log('✅ Qualifications requirement met')
+      }
+    }
+
+    console.log('🎯 Final qualification:', qualification.qualified)
+    return qualification
+  }
+
   const filterAndSortJobs = () => {
+    console.log('🔍 Starting job filtering...')
+    console.log('📚 Total jobs:', jobs.length)
+    console.log('👤 Student profile:', studentProfile)
+    console.log('✅ Qualification checked:', qualificationChecked)
+
     let filtered = jobs
+
+    // Apply qualification filtering if student profile is available
+    if (studentProfile && qualificationChecked) {
+      console.log('🎯 Applying qualification filtering...')
+      const beforeFilter = filtered.length
+      
+      filtered = filtered.filter(job => {
+        const qualification = checkJobQualification(job, studentProfile)
+        job.qualification = qualification // Attach qualification info to job
+        return qualification.qualified
+      })
+      
+      console.log(`📊 Filtered from ${beforeFilter} to ${filtered.length} jobs`)
+    } else if (qualificationChecked) {
+      console.log('ℹ️ No student profile available, showing all jobs')
+    }
 
     // Search filter
     if (searchTerm) {
@@ -121,7 +315,9 @@ const JobBrowser = () => {
         job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         job.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
         job.company?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        job.requirements.some(req => req.toLowerCase().includes(searchTerm.toLowerCase()))
+        (job.requirements?.requiredSkills && job.requirements.requiredSkills.some(skill => 
+          skill.toLowerCase().includes(searchTerm.toLowerCase())
+        ))
       )
     }
 
@@ -144,13 +340,13 @@ const JobBrowser = () => {
     filtered.sort((a, b) => {
       switch (sortBy) {
         case 'newest':
-          return b.createdAt - a.createdAt
+          return new Date(b.createdAt?.toDate?.() || b.createdAt) - new Date(a.createdAt?.toDate?.() || a.createdAt)
         case 'oldest':
-          return a.createdAt - b.createdAt
+          return new Date(a.createdAt?.toDate?.() || a.createdAt) - new Date(b.createdAt?.toDate?.() || b.createdAt)
         case 'title':
           return a.title.localeCompare(b.title)
         case 'deadline':
-          return a.deadline - b.deadline
+          return new Date(a.deadline?.toDate?.() || a.deadline) - new Date(b.deadline?.toDate?.() || b.deadline)
         case 'company':
           return a.company?.name?.localeCompare(b.company?.name)
         default:
@@ -158,6 +354,7 @@ const JobBrowser = () => {
       }
     })
 
+    console.log('✅ Final filtered jobs:', filtered.length)
     setFilteredJobs(filtered)
   }
 
@@ -174,15 +371,19 @@ const JobBrowser = () => {
     }
 
     try {
+      const job = jobs.find(j => j.id === jobId)
       const applicationData = {
         studentId: userData.uid,
         jobId: jobId,
-        companyId: jobs.find(j => j.id === jobId)?.companyId,
+        companyId: job?.companyId,
         status: 'pending',
         appliedAt: new Date(),
         // Student profile information
         studentName: userData.displayName,
-        studentEmail: userData.email
+        studentEmail: userData.email,
+        // Qualification info
+        qualified: job?.qualification?.qualified || false,
+        qualificationDetails: job?.qualification || {}
       }
 
       await addDoc(collection(db, 'jobApplications'), applicationData)
@@ -300,9 +501,34 @@ const JobBrowser = () => {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Browse Jobs</h1>
           <p className="text-gray-600 mt-2">
-            Discover career opportunities from partner companies
+            {studentProfile 
+              ? "Jobs you qualify for based on your profile"
+              : "Discover career opportunities from partner companies"
+            }
+            {!qualificationChecked && " (Checking your qualifications...)"}
           </p>
+          {studentProfile && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <p className="text-sm text-blue-800">
+                <strong>Your Profile:</strong> {studentProfile.educationLevel || 'Not specified'} | 
+                Skills: {studentProfile.skills?.length || 0}
+              </p>
+              <p className="text-xs text-blue-600 mt-1">
+                Debug: {jobs.length} total jobs, {filteredJobs.length} qualified
+              </p>
+            </div>
+          )}
         </div>
+
+        {/* Qualification Notice */}
+        {!studentProfile && qualificationChecked && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+            <p className="text-sm text-yellow-800">
+              <strong>Note:</strong> We couldn't find your complete profile information. 
+              Please update your student profile with your education, skills, and experience to see jobs you qualify for.
+            </p>
+          </div>
+        )}
 
         {/* Filters and Search */}
         <div className="card mb-6">
@@ -379,6 +605,19 @@ const JobBrowser = () => {
             
             return (
               <div key={job.id} className="card group hover:shadow-lg transition-shadow duration-300">
+                {/* Qualification Badge */}
+                {job.qualification && (
+                  <div className="mb-3">
+                    <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
+                      job.qualification.qualified 
+                        ? 'bg-green-100 text-green-800 border border-green-200' 
+                        : 'bg-red-100 text-red-800 border border-red-200'
+                    }`}>
+                      {job.qualification.qualified ? 'You Qualify' : 'Requirements Not Met'}
+                    </span>
+                  </div>
+                )}
+
                 {/* Job Header */}
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
@@ -434,6 +673,30 @@ const JobBrowser = () => {
                   )}
                 </div>
 
+                {/* Requirements Preview */}
+                {job.requirements && (
+                  <div className="mb-4 p-3 bg-slate-50 rounded-lg">
+                    <h4 className="text-sm font-medium text-slate-800 mb-2 flex items-center">
+                      <Target className="h-4 w-4 mr-2" />
+                      Requirements:
+                    </h4>
+                    <div className="space-y-1 text-xs text-slate-600">
+                      {job.requirements.minEducation && (
+                        <p>Education: {job.requirements.minEducation}</p>
+                      )}
+                      {job.requirements.minExperience && (
+                        <p>Experience: {getExperienceLabel(job.requirements.minExperience)}</p>
+                      )}
+                      {job.requirements.minGPA && (
+                        <p>Minimum GPA: {job.requirements.minGPA}</p>
+                      )}
+                      {job.requirements.requiredSkills && job.requirements.requiredSkills.length > 0 && (
+                        <p>Skills: {job.requirements.requiredSkills.slice(0, 3).join(', ')}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* Application Deadline */}
                 <div className={`p-3 rounded-lg mb-4 ${
                   deadlinePassed 
@@ -453,62 +716,46 @@ const JobBrowser = () => {
                   )}
                 </div>
 
-                {/* Requirements Preview */}
-                <div className="mb-4">
-                  <h4 className="text-sm font-medium text-gray-900 mb-2">Key Requirements:</h4>
-                  <div className="flex flex-wrap gap-1">
-                    {job.requirements.slice(0, 3).map((requirement, index) => (
-                      <span key={index} className="inline-block bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded">
-                        {requirement}
-                      </span>
-                    ))}
-                    {job.requirements.length > 3 && (
-                      <span className="inline-block bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded">
-                        +{job.requirements.length - 3} more
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Qualifications Preview */}
-                {job.qualifications && job.qualifications.length > 0 && (
-                  <div className="mb-4">
-                    <h4 className="text-sm font-medium text-gray-900 mb-2">Qualifications:</h4>
-                    <div className="flex flex-wrap gap-1">
-                      {job.qualifications.slice(0, 2).map((qualification, index) => (
-                        <span key={index} className="inline-block bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded">
-                          {qualification}
-                        </span>
-                      ))}
-                      {job.qualifications.length > 2 && (
-                        <span className="inline-block bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded">
-                          +{job.qualifications.length - 2} more
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )}
-
                 {/* Action Buttons */}
                 <div className="flex space-x-2">
-                  <button className="btn-secondary flex-1 text-sm flex items-center justify-center">
+                  <button 
+                    onClick={() => navigate(`/jobs/${job.id}`)}
+                    className="btn-secondary flex-1 text-sm flex items-center justify-center"
+                  >
                     <Eye className="h-4 w-4 mr-1" />
                     View Details
                   </button>
                   <button
                     onClick={() => applyForJob(job.id)}
-                    disabled={hasApplied || deadlinePassed || !userData}
+                    disabled={hasApplied || deadlinePassed || !userData || (job.qualification && !job.qualification.qualified)}
                     className={`flex-1 text-sm flex items-center justify-center ${
                       hasApplied 
                         ? 'btn-secondary cursor-not-allowed' 
                         : deadlinePassed
                         ? 'btn-secondary cursor-not-allowed'
+                        : (job.qualification && !job.qualification.qualified)
+                        ? 'btn-secondary cursor-not-allowed'
                         : 'btn-primary'
                     }`}
                   >
-                    {hasApplied ? 'Applied' : deadlinePassed ? 'Closed' : 'Apply Now'}
+                    {hasApplied ? 'Applied' : 
+                     deadlinePassed ? 'Closed' : 
+                     (job.qualification && !job.qualification.qualified) ? 'Not Qualified' : 
+                     'Apply Now'}
                   </button>
                 </div>
+
+                {/* Qualification Details */}
+                {job.qualification && !job.qualification.qualified && (
+                  <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+                    <p className="font-medium">Why you don't qualify:</p>
+                    <ul className="list-disc list-inside mt-1">
+                      {job.qualification.missingQualifications.map((req, index) => (
+                        <li key={index}>{req}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
 
                 {/* Application Status */}
                 {hasApplied && (
@@ -526,36 +773,63 @@ const JobBrowser = () => {
         {filteredJobs.length === 0 && (
           <div className="text-center py-12">
             <Briefcase className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No jobs found</h3>
+            <h3 className="mt-2 text-sm font-medium text-gray-900">
+              {jobs.length === 0 ? 'No jobs available' : 'No jobs match your qualifications'}
+            </h3>
             <p className="mt-1 text-sm text-gray-500">
-              {jobs.length === 0 ? 'No jobs available at the moment.' : 'Try changing your filters.'}
+              {jobs.length === 0 ? 'No jobs available at the moment.' : 
+               studentProfile ? 'Try updating your profile or explore different filters.' :
+               'Try adjusting your search terms or filters.'}
             </p>
+            {studentProfile && jobs.length > 0 && (
+              <div className="mt-4 p-4 bg-blue-50 rounded-lg max-w-md mx-auto">
+                <p className="text-sm text-blue-800">
+                  <strong>Debug Info:</strong> You have a {studentProfile.educationLevel || 'Not specified'} degree. 
+                  There are {jobs.length} total jobs but none match your current qualifications.
+                </p>
+              </div>
+            )}
           </div>
         )}
 
         {/* Results Count */}
-        <div className="mt-6 text-center">
-          <p className="text-sm text-gray-600">
-            Showing {filteredJobs.length} of {jobs.length} jobs
-          </p>
-        </div>
+        {filteredJobs.length > 0 && (
+          <div className="mt-6 text-center">
+            <p className="text-sm text-gray-600">
+              Showing {filteredJobs.length} of {jobs.length} jobs
+              {studentProfile && ' that you qualify for'}
+            </p>
+          </div>
+        )}
 
         {/* Job Search Tips */}
         <div className="card mt-6 bg-blue-50 border-blue-200">
-          <h3 className="text-lg font-semibold text-blue-900 mb-3">Job Search Tips</h3>
+          <h3 className="text-lg font-semibold text-blue-900 mb-3">
+            {studentProfile ? 'Improve Your Qualifications' : 'Job Search Tips'}
+          </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-blue-800">
             <div>
               <ul className="space-y-2">
-                <li>• Tailor your resume for each job application</li>
-                <li>• Highlight relevant skills and experience</li>
-                <li>• Research the company before applying</li>
+                <li className="flex items-start">
+                  <GraduationCap className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
+                  Update your education level in your profile
+                </li>
+                <li className="flex items-start">
+                  <Award className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
+                  Add all your skills and certifications
+                </li>
+                <li className="flex items-start">
+                  <Briefcase className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
+                  Include relevant work experience
+                </li>
               </ul>
             </div>
             <div>
               <ul className="space-y-2">
-                <li>• Keep your student profile updated</li>
-                <li>• Save interesting jobs for later review</li>
+                <li>• Tailor your resume for each job application</li>
+                <li>• Research the company before applying</li>
                 <li>• Apply early before deadlines</li>
+                <li>• Save interesting jobs for later review</li>
               </ul>
             </div>
           </div>

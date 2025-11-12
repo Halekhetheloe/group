@@ -66,6 +66,45 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
+  // Function to determine user role from role-specific documents
+  const determineUserRole = async (userId) => {
+    try {
+      // Check company document first
+      const companyDoc = await getDoc(doc(db, 'companies', userId))
+      if (companyDoc.exists()) {
+        console.log('🏢 Found company document for user:', userId)
+        return 'company'
+      }
+
+      // Check institution document
+      const institutionDoc = await getDoc(doc(db, 'institutions', userId))
+      if (institutionDoc.exists()) {
+        console.log('🏛️ Found institution document for user:', userId)
+        return 'institution'
+      }
+
+      // Check student document
+      const studentDoc = await getDoc(doc(db, 'students', userId))
+      if (studentDoc.exists()) {
+        console.log('🎓 Found student document for user:', userId)
+        return 'student'
+      }
+
+      // Check admin document (if you have one)
+      const adminDoc = await getDoc(doc(db, 'admins', userId))
+      if (adminDoc.exists()) {
+        console.log('👑 Found admin document for user:', userId)
+        return 'admin'
+      }
+
+      console.log('❌ No role-specific documents found, defaulting to student')
+      return 'student' // Default fallback
+    } catch (error) {
+      console.error('Error determining user role:', error)
+      return 'student'
+    }
+  }
+
   useEffect(() => {
     let unsubscribeUserData = () => {}
 
@@ -110,38 +149,52 @@ export const AuthProvider = ({ children }) => {
             } else {
               console.log('❌ No user data found for:', user.uid)
               
-              // Try to get role-specific data to determine status
-              let userStatus = 'active'
-              let userRole = 'student'
+              // FIXED: Determine role from role-specific documents FIRST
+              const userRole = await determineUserRole(user.uid)
+              let userStatus = userRole === 'student' ? 'active' : 'pending'
+              let displayName = user.displayName || ''
               
-              // Check if user has a company document
-              try {
-                const companyDoc = await getDoc(doc(db, 'companies', user.uid))
-                if (companyDoc.exists()) {
-                  userRole = 'company'
-                  userStatus = companyDoc.data().status || 'pending'
+              // Get additional data from role-specific document
+              if (userRole === 'company') {
+                try {
+                  const companyDoc = await getDoc(doc(db, 'companies', user.uid))
+                  if (companyDoc.exists()) {
+                    const companyData = companyDoc.data()
+                    userStatus = companyData.status || 'pending'
+                    displayName = companyData.name || displayName
+                  }
+                } catch (error) {
+                  console.error('Error fetching company data:', error)
                 }
-              } catch (error) {
-                console.log('No company document found')
+              } else if (userRole === 'institution') {
+                try {
+                  const institutionDoc = await getDoc(doc(db, 'institutions', user.uid))
+                  if (institutionDoc.exists()) {
+                    const institutionData = institutionDoc.data()
+                    userStatus = institutionData.status || 'pending'
+                    displayName = institutionData.name || displayName
+                  }
+                } catch (error) {
+                  console.error('Error fetching institution data:', error)
+                }
+              } else if (userRole === 'student') {
+                try {
+                  const studentDoc = await getDoc(doc(db, 'students', user.uid))
+                  if (studentDoc.exists()) {
+                    const studentData = studentDoc.data()
+                    displayName = studentData.displayName || displayName
+                  }
+                } catch (error) {
+                  console.error('Error fetching student data:', error)
+                }
               }
               
-              // Check if user has an institution document
-              try {
-                const institutionDoc = await getDoc(doc(db, 'institutions', user.uid))
-                if (institutionDoc.exists()) {
-                  userRole = 'institution'
-                  userStatus = institutionDoc.data().status || 'pending'
-                }
-              } catch (error) {
-                console.log('No institution document found')
-              }
-              
-              // Create user document with correct status
+              // Create user document with correct role and status
               const userDocData = {
                 uid: user.uid,
                 email: user.email,
-                displayName: user.displayName || '',
-                role: userRole,
+                displayName: displayName,
+                role: userRole, // FIXED: Use determined role, not default 'student'
                 status: userStatus,
                 profileCompleted: false,
                 createdAt: new Date(),
@@ -150,7 +203,7 @@ export const AuthProvider = ({ children }) => {
               
               try {
                 await setDoc(userDocRef, userDocData)
-                console.log('📝 Created user document with status:', userStatus)
+                console.log('📝 Created user document with role:', userRole, 'and status:', userStatus)
                 setUserData(userDocData)
               } catch (error) {
                 console.error('Error creating user document:', error)
@@ -162,18 +215,20 @@ export const AuthProvider = ({ children }) => {
           },
           (error) => {
             console.error('❌ Error listening to user data:', error)
-            // Create fallback user data
-            const fallbackUserData = {
-              uid: user.uid,
-              email: user.email,
-              displayName: user.displayName || '',
-              role: 'student',
-              status: 'active',
-              profileCompleted: false
-            }
-            setUserData(fallbackUserData)
-            setUserDataLoading(false)
-            setLoading(false)
+            // FIXED: Determine role for fallback data
+            determineUserRole(user.uid).then(role => {
+              const fallbackUserData = {
+                uid: user.uid,
+                email: user.email,
+                displayName: user.displayName || '',
+                role: role, // FIXED: Use determined role
+                status: role === 'student' ? 'active' : 'pending',
+                profileCompleted: false
+              }
+              setUserData(fallbackUserData)
+              setUserDataLoading(false)
+              setLoading(false)
+            })
           }
         )
 
@@ -200,14 +255,16 @@ export const AuthProvider = ({ children }) => {
               setUserData(data)
             }
           } else {
-            console.log('📝 Creating user document for:', user.uid)
-            // Get status from role-specific documents
-            const userStatus = await getUserStatus(user.uid, 'student') // Default to student
+            console.log('📝 Creating initial user document for:', user.uid)
+            // FIXED: Determine role properly for initial creation
+            const userRole = await determineUserRole(user.uid)
+            const userStatus = userRole === 'student' ? 'active' : 'pending'
+            
             const userDocData = {
               uid: user.uid,
               email: user.email,
               displayName: user.displayName || '',
-              role: 'student',
+              role: userRole, // FIXED: Use determined role
               status: userStatus,
               profileCompleted: false,
               createdAt: new Date(),
@@ -282,7 +339,7 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (email, password, userData) => {
     try {
-      console.log('📝 Starting registration for:', email)
+      console.log('📝 Starting registration for:', email, 'with role:', userData.role)
       const { user: newUser } = await createUserWithEmailAndPassword(auth, email, password)
       
       // Send email verification
@@ -336,7 +393,7 @@ export const AuthProvider = ({ children }) => {
         })
       }
 
-      console.log('✅ Registration completed for:', email)
+      console.log('✅ Registration completed for:', email, 'with role:', userData.role)
       toast.success('Registration successful! Please check your email for verification.')
       return newUser
     } catch (error) {
@@ -570,7 +627,7 @@ export const AuthProvider = ({ children }) => {
     resetPassword,
     updateUserProfile,
     refreshUserData,
-    syncUserStatus // Add this function
+    syncUserStatus
   }
 
   console.log('🔑 AuthProvider rendering - Loading:', loading, 'UserDataLoading:', userDataLoading)
