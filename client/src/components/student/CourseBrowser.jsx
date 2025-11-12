@@ -546,7 +546,7 @@ const CourseBrowser = () => {
                 Points: {studentGrades.points || 'Not specified'}
               </p>
               <p className="text-xs text-blue-600 mt-1">
-                Debug: {courses.length} total courses, {filteredCourses.length} filtered
+               {courses.length} total courses, {filteredCourses.length} filtered
               </p>
             </div>
           )}
