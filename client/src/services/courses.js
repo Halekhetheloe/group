@@ -69,10 +69,10 @@ export const useCourses = () => {
     }
   }, [getDocuments, user, userData, notifyError])
 
-  // Filter courses by student eligibility
+  // Filter courses by student eligibility - FIXED VERSION
   const filterCoursesByEligibility = useCallback(async (courses, studentId) => {
     try {
-      // Get student grades
+      // Get student profile with qualifications
       const studentDoc = await getDoc(doc(db, 'students', studentId))
       if (!studentDoc.exists()) {
         console.warn('Student document not found')
@@ -80,28 +80,41 @@ export const useCourses = () => {
       }
 
       const studentData = studentDoc.data()
-      const studentGrades = studentData.grades || studentData.academicRecords
+      
+      // FIXED: Get grades from qualifications (StudentProfile saves here)
+      const studentGrades = studentData.qualifications?.grades || studentData.grades || studentData.academicRecords
 
       if (!studentGrades) {
         console.warn('No grade information found for student')
         return courses
       }
 
+      console.log('🔍 DEBUG: Student grades for eligibility:', studentGrades)
+
       // Filter courses based on eligibility
-      return courses.filter(course => {
+      const eligibleCourses = courses.filter(course => {
         const eligibility = checkCourseEligibility(course, studentGrades)
         course.eligibility = eligibility
+        console.log(`Course ${course.name}: ${eligibility.eligible ? 'ELIGIBLE' : 'NOT ELIGIBLE'}`, eligibility)
         return eligibility.eligible
       })
+
+      console.log(`✅ Eligible courses: ${eligibleCourses.length}/${courses.length}`)
+      return eligibleCourses
     } catch (error) {
       console.error('Error filtering courses by eligibility:', error)
       return courses
     }
   }, [])
 
-  // Check course eligibility
+  // Check course eligibility - FIXED VERSION
   const checkCourseEligibility = useCallback((course, studentGrades) => {
+    console.log('🔍 Checking eligibility for:', course.name)
+    console.log('Course requirements:', course.requirements)
+    console.log('Student grades:', studentGrades)
+
     if (!course.requirements) {
+      console.log('✅ No requirements - automatically eligible')
       return { eligible: true, missingRequirements: [], meetsRequirements: ['No requirements specified'] }
     }
     
@@ -112,24 +125,39 @@ export const useCourses = () => {
       meetsRequirements: []
     }
 
+    // FIXED: Get student data with proper field names
+    const studentOverallGrade = studentGrades.overall || ''
+    const studentSubjects = studentGrades.subjects || {}
+    const studentPoints = parseInt(studentGrades.points) || 0
+
+    console.log(`Student: ${studentOverallGrade} grade, ${studentPoints} points, ${Object.keys(studentSubjects).length} subjects`)
+
     // Check minimum grade requirement
     if (requirements.minGrade) {
       const gradeOrder = { 'A': 5, 'B': 4, 'C': 3, 'D': 2, 'E': 1, 'F': 0 }
-      const studentOverallGrade = studentGrades.overall || 'F'
+      const studentGradeValue = gradeOrder[studentOverallGrade.toUpperCase()] || 0
+      const requiredGradeValue = gradeOrder[requirements.minGrade.toUpperCase()] || 0
       
-      if (gradeOrder[studentOverallGrade] < gradeOrder[requirements.minGrade]) {
+      console.log(`Grade check: ${studentOverallGrade} (${studentGradeValue}) vs ${requirements.minGrade} (${requiredGradeValue})`)
+      
+      if (studentGradeValue < requiredGradeValue) {
         eligibility.eligible = false
-        eligibility.missingRequirements.push(`Minimum grade of ${requirements.minGrade} required`)
+        eligibility.missingRequirements.push(`Minimum grade of ${requirements.minGrade} required (you have ${studentOverallGrade})`)
       } else {
         eligibility.meetsRequirements.push(`Meets grade requirement (${requirements.minGrade})`)
       }
     }
 
-    // Check subject requirements
-    if (requirements.subjects && requirements.subjects.length > 0) {
-      const missingSubjects = requirements.subjects.filter(subject => 
-        !studentGrades.subjects || !studentGrades.subjects[subject]
-      )
+    // FIXED: Check subject requirements - support both field names
+    const requiredSubjects = requirements.subjects || requirements.requiredSubjects
+    if (requiredSubjects && requiredSubjects.length > 0) {
+      console.log('Required subjects:', requiredSubjects)
+      console.log('Student subjects:', studentSubjects)
+
+      const missingSubjects = requiredSubjects.filter(subject => {
+        // Check if student has the subject with any grade
+        return !studentSubjects.hasOwnProperty(subject)
+      })
 
       if (missingSubjects.length > 0) {
         eligibility.eligible = false
@@ -141,15 +169,16 @@ export const useCourses = () => {
 
     // Check minimum points
     if (requirements.minPoints) {
-      const studentPoints = studentGrades.points || 0
+      console.log(`Points check: ${studentPoints} vs ${requirements.minPoints}`)
       if (studentPoints < requirements.minPoints) {
         eligibility.eligible = false
-        eligibility.missingRequirements.push(`Minimum ${requirements.minPoints} points required`)
+        eligibility.missingRequirements.push(`Minimum ${requirements.minPoints} points required (you have ${studentPoints})`)
       } else {
         eligibility.meetsRequirements.push(`Meets points requirement (${requirements.minPoints})`)
       }
     }
 
+    console.log(`Eligibility result: ${eligibility.eligible ? 'ELIGIBLE' : 'NOT ELIGIBLE'}`)
     return eligibility
   }, [])
 
@@ -216,7 +245,9 @@ export const useCourses = () => {
       }
 
       const studentData = studentDoc.data()
-      const studentGrades = studentData.grades || studentData.academicRecords
+      
+      // FIXED: Get grades from qualifications
+      const studentGrades = studentData.qualifications?.grades || studentData.grades || studentData.academicRecords
 
       if (!studentGrades) {
         throw new Error('No grade information found')
@@ -231,7 +262,6 @@ export const useCourses = () => {
     }
   }, [user, userData, getCourseDetails, checkCourseEligibility, notifyError])
 
-  // ... rest of your existing methods remain the same
   // Create new course (for institutions)
   const createCourse = useCallback(async (courseData) => {
     if (!user || userData?.role !== 'institution') {
@@ -300,7 +330,7 @@ export const useCourses = () => {
       
       await deleteDocument('courses', courseId)
       notifySuccess('Course deleted successfully')
-    } catch (error) {
+    } catch ( error) {
       notifyError('Failed to delete course', error)
       throw error
     } finally {

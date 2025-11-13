@@ -1,395 +1,360 @@
-// Qualification matching utilities
-export const qualificationUtils = {
-  // Check if student meets all job requirements
-  checkJobQualification: (job, studentProfile) => {
-    if (!job.requirements || !studentProfile?.qualifications) {
-      return { qualified: false, reasons: ['Missing requirements or qualifications'] }
-    }
-
-    const jobReq = job.requirements
-    const studentQual = studentProfile.qualifications
-    const reasons = []
-    let meetsAllRequirements = true
-
-    // 1. Check GPA requirement
-    if (jobReq.minGPA && studentQual.gpa) {
-      if (studentQual.gpa < jobReq.minGPA) {
-        meetsAllRequirements = false
-        reasons.push(`GPA too low: ${studentQual.gpa} < required ${jobReq.minGPA}`)
-      }
-    } else if (jobReq.minGPA && !studentQual.gpa) {
-      meetsAllRequirements = false
-      reasons.push('GPA requirement exists but student has no GPA recorded')
-    }
-
-    // 2. Check education level
-    if (jobReq.educationLevel) {
-      const educationHierarchy = {
-        'high_school': 1,
-        'associate': 2,
-        'bachelor': 3,
-        'master': 4,
-        'phd': 5
-      }
-
-      const studentLevel = educationHierarchy[studentQual.educationLevel] || 0
-      const requiredLevel = educationHierarchy[jobReq.educationLevel] || 0
-
-      if (studentLevel < requiredLevel) {
-        meetsAllRequirements = false
-        reasons.push(`Education level too low: ${studentQual.educationLevel} < required ${jobReq.educationLevel}`)
-      }
-    }
-
-    // 3. Check degree type
-    if (jobReq.degreeType && studentQual.degreeType) {
-      if (jobReq.degreeType.toLowerCase() !== studentQual.degreeType.toLowerCase()) {
-        meetsAllRequirements = false
-        reasons.push(`Degree type mismatch: ${studentQual.degreeType} ≠ required ${jobReq.degreeType}`)
-      }
-    } else if (jobReq.degreeType && !studentQual.degreeType) {
-      meetsAllRequirements = false
-      reasons.push(`Degree type required: ${jobReq.degreeType} but student has no degree type recorded`)
-    }
-
-    // 4. Check required certificates
-    if (jobReq.requiredCertificates && jobReq.requiredCertificates.length > 0) {
-      const missingCertificates = jobReq.requiredCertificates.filter(cert => 
-        !studentQual.certificates?.includes(cert)
-      )
-      
-      if (missingCertificates.length > 0) {
-        meetsAllRequirements = false
-        reasons.push(`Missing certificates: ${missingCertificates.join(', ')}`)
-      }
-    }
-
-    // 5. Check required skills (at least 60% match)
-    if (jobReq.requiredSkills && jobReq.requiredSkills.length > 0) {
-      const studentSkills = studentQual.skills || []
-      const matchingSkills = jobReq.requiredSkills.filter(skill =>
-        studentSkills.includes(skill)
-      )
-      const skillMatchPercentage = (matchingSkills.length / jobReq.requiredSkills.length) * 100
-
-      if (skillMatchPercentage < 60) {
-        meetsAllRequirements = false
-        reasons.push(`Insufficient skills: ${skillMatchPercentage.toFixed(0)}% match (need 60%)`)
-      }
-    }
-
-    // 6. Check experience level
-    if (jobReq.minExperience) {
-      const experienceHierarchy = {
-        'no_experience': 1,
-        'internship': 2,
-        'entry_level': 3,
-        'mid_level': 4,
-        'senior_level': 5,
-        'executive': 6
-      }
-
-      const studentExp = experienceHierarchy[studentQual.experience] || 0
-      const requiredExp = experienceHierarchy[jobReq.minExperience] || 0
-
-      if (studentExp < requiredExp) {
-        meetsAllRequirements = false
-        reasons.push(`Experience level too low: ${studentQual.experience} < required ${jobReq.minExperience}`)
-      }
-    }
-
-    // 7. Check required documents
-    if (jobReq.requiredDocuments && jobReq.requiredDocuments.length > 0) {
-      const studentDocs = studentQual.documents || {}
-      const missingDocuments = jobReq.requiredDocuments.filter(doc => 
-        !studentDocs[doc]
-      )
-      
-      if (missingDocuments.length > 0) {
-        meetsAllRequirements = false
-        reasons.push(`Missing documents: ${missingDocuments.map(doc => 
-          doc.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
-        ).join(', ')}`)
-      }
-    }
-
-    return {
-      qualified: meetsAllRequirements,
-      reasons: meetsAllRequirements ? ['Meets all requirements'] : reasons,
-      matchScore: meetsAllRequirements ? 100 : this.calculateMatchScore(jobReq, studentQual)
-    }
+// Unified Qualification Utilities
+const qualificationUtils = {
+  // Education level hierarchy
+  educationLevels: {
+    'high_school': { value: 1, label: 'High School Diploma' },
+    'associate': { value: 2, label: 'Associate Degree' },
+    'bachelor': { value: 3, label: "Bachelor's Degree" },
+    'master': { value: 4, label: "Master's Degree" },
+    'phd': { value: 5, label: 'PhD' }
   },
 
-  // Calculate match score percentage (0-100)
-  calculateMatchScore: (jobRequirements, studentQualifications) => {
-    let score = 0
-    let totalWeight = 0
-    const weights = {
-      gpa: 15,
-      educationLevel: 20,
-      degreeType: 10,
-      certificates: 15,
-      skills: 20,
-      experience: 15,
-      documents: 5
+  // Experience level hierarchy
+  experienceLevels: {
+    'no_experience': { value: 1, label: 'No Experience' },
+    'internship': { value: 2, label: 'Internship' },
+    'entry_level': { value: 3, label: 'Entry Level (0-2 years)' },
+    'mid_level': { value: 4, label: 'Mid Level (2-5 years)' },
+    'senior_level': { value: 5, label: 'Senior Level (5+ years)' },
+    'executive': { value: 6, label: 'Executive' }
+  },
+
+  // Grade values for comparison
+  gradeValues: {
+    'A': 4, 'B': 3, 'C': 2, 'D': 1, 'E': 0, 'F': 0
+  },
+
+  /**
+   * Filter jobs based on student qualifications
+   */
+  filterQualifiedJobs: (jobs, studentProfile) => {
+    console.log('🔍 Filtering jobs based on qualifications...');
+    
+    if (!jobs || !Array.isArray(jobs)) {
+      console.log('❌ No jobs provided or invalid format');
+      return [];
     }
 
-    // GPA match (if required)
-    if (jobRequirements.minGPA) {
-      totalWeight += weights.gpa
-      if (studentQualifications.gpa && studentQualifications.gpa >= jobRequirements.minGPA) {
-        score += weights.gpa
-      } else if (studentQualifications.gpa) {
-        // Partial credit for close GPA
-        const gpaDiff = jobRequirements.minGPA - studentQualifications.gpa
-        if (gpaDiff <= 0.5) {
-          score += weights.gpa * 0.5
+    if (!studentProfile || !studentProfile.qualifications) {
+      console.log('❌ No student profile or qualifications found');
+      return jobs; // Return all jobs if no qualifications to filter by
+    }
+
+    const studentQual = studentProfile.qualifications;
+    console.log('Student qualifications:', studentQual);
+
+    const qualifiedJobs = jobs.filter(job => {
+      console.log(`\nChecking job: ${job.title}`);
+      
+      if (!job.requirements) {
+        console.log('✅ Job has no requirements - student qualifies');
+        return true;
+      }
+
+      const jobReq = job.requirements;
+      let qualifies = true;
+      let reasons = [];
+
+      // 1. Check education level
+      if (jobReq.educationalLevel || jobReq.educationLevel) {
+        const requiredLevel = jobReq.educationalLevel || jobReq.educationLevel;
+        const studentLevel = studentQual.educationLevel;
+        
+        const studentLevelValue = qualificationUtils.educationLevels[studentLevel]?.value || 0;
+        const requiredLevelValue = qualificationUtils.educationLevels[requiredLevel]?.value || 0;
+        
+        if (studentLevelValue < requiredLevelValue) {
+          qualifies = false;
+          reasons.push(`Education level too low: ${studentLevel} < required ${requiredLevel}`);
+        } else {
+          reasons.push(`✅ Education level met: ${studentLevel} >= ${requiredLevel}`);
         }
       }
-    }
 
-    // Education level match
-    if (jobRequirements.educationLevel) {
-      totalWeight += weights.educationLevel
-      const educationHierarchy = {
-        'high_school': 1, 'associate': 2, 'bachelor': 3, 'master': 4, 'phd': 5
+      // 2. Check GPA
+      if (jobReq.minGPA && jobReq.minGPA > 0) {
+        const studentGPA = parseFloat(studentQual.gpa) || 0;
+        if (studentGPA < jobReq.minGPA) {
+          qualifies = false;
+          reasons.push(`GPA too low: ${studentGPA} < required ${jobReq.minGPA}`);
+        } else {
+          reasons.push(`✅ GPA met: ${studentGPA} >= ${jobReq.minGPA}`);
+        }
       }
-      const studentLevel = educationHierarchy[studentQualifications.educationLevel] || 0
-      const requiredLevel = educationHierarchy[jobRequirements.educationLevel] || 0
-      
-      if (studentLevel >= requiredLevel) {
-        score += weights.educationLevel
-      } else if (studentLevel >= requiredLevel - 1) {
-        score += weights.educationLevel * 0.5
+
+      // 3. Check degree type
+      if (jobReq.degreeType && studentQual.degreeType) {
+        if (jobReq.degreeType.toLowerCase() !== studentQual.degreeType.toLowerCase()) {
+          qualifies = false;
+          reasons.push(`Degree type mismatch: ${studentQual.degreeType} ≠ required ${jobReq.degreeType}`);
+        } else {
+          reasons.push(`✅ Degree type matches: ${studentQual.degreeType}`);
+        }
       }
-    }
 
-    // Degree type match
-    if (jobRequirements.degreeType) {
-      totalWeight += weights.degreeType
-      if (studentQualifications.degreeType && 
-          studentQualifications.degreeType.toLowerCase() === jobRequirements.degreeType.toLowerCase()) {
-        score += weights.degreeType
+      // 4. Check experience level
+      if (jobReq.minExperience) {
+        const studentExpValue = qualificationUtils.experienceLevels[studentQual.experience]?.value || 0;
+        const requiredExpValue = qualificationUtils.experienceLevels[jobReq.minExperience]?.value || 0;
+        
+        if (studentExpValue < requiredExpValue) {
+          qualifies = false;
+          reasons.push(`Experience level too low: ${studentQual.experience} < required ${jobReq.minExperience}`);
+        } else {
+          reasons.push(`✅ Experience level met: ${studentQual.experience} >= ${jobReq.minExperience}`);
+        }
       }
-    }
 
-    // Certificates match
-    if (jobRequirements.requiredCertificates && jobRequirements.requiredCertificates.length > 0) {
-      totalWeight += weights.certificates
-      const studentCerts = studentQualifications.certificates || []
-      const certMatch = jobRequirements.requiredCertificates.filter(cert => 
-        studentCerts.includes(cert)
-      ).length
-      const certPercentage = certMatch / jobRequirements.requiredCertificates.length
-      score += weights.certificates * certPercentage
-    }
+      console.log(`Job ${qualifies ? '✅ QUALIFIES' : '❌ DOES NOT QUALIFY'}:`, reasons);
+      return qualifies;
+    });
 
-    // Skills match
-    if (jobRequirements.requiredSkills && jobRequirements.requiredSkills.length > 0) {
-      totalWeight += weights.skills
-      const studentSkills = studentQualifications.skills || []
-      const skillMatch = jobRequirements.requiredSkills.filter(skill =>
-        studentSkills.includes(skill)
-      ).length
-      const skillPercentage = skillMatch / jobRequirements.requiredSkills.length
-      score += weights.skills * skillPercentage
-    }
-
-    // Experience match
-    if (jobRequirements.minExperience) {
-      totalWeight += weights.experience
-      const experienceHierarchy = {
-        'no_experience': 1, 'internship': 2, 'entry_level': 3, 
-        'mid_level': 4, 'senior_level': 5, 'executive': 6
-      }
-      const studentExp = experienceHierarchy[studentQualifications.experience] || 0
-      const requiredExp = experienceHierarchy[jobRequirements.minExperience] || 0
-      
-      if (studentExp >= requiredExp) {
-        score += weights.experience
-      } else if (studentExp >= requiredExp - 1) {
-        score += weights.experience * 0.5
-      }
-    }
-
-    // Documents match
-    if (jobRequirements.requiredDocuments && jobRequirements.requiredDocuments.length > 0) {
-      totalWeight += weights.documents
-      const studentDocs = studentQualifications.documents || {}
-      const docMatch = jobRequirements.requiredDocuments.filter(doc => 
-        studentDocs[doc]
-      ).length
-      const docPercentage = docMatch / jobRequirements.requiredDocuments.length
-      score += weights.documents * docPercentage
-    }
-
-    return totalWeight > 0 ? Math.round((score / totalWeight) * 100) : 0
+    console.log(`✅ Found ${qualifiedJobs.length} qualified jobs out of ${jobs.length}`);
+    return qualifiedJobs;
   },
 
-  // Get qualification breakdown for display
+  /**
+   * Filter courses based on student grades
+   */
+  filterQualifiedCourses: (courses, studentProfile) => {
+    console.log('📚 Filtering courses based on grades...');
+    
+    if (!courses || !Array.isArray(courses)) {
+      console.log('❌ No courses provided or invalid format');
+      return [];
+    }
+
+    if (!studentProfile || !studentProfile.qualifications) {
+      console.log('❌ No student profile or qualifications found');
+      return courses; // Return all courses if no grades to filter by
+    }
+
+    const studentGrades = studentProfile.qualifications.grades || {};
+    const studentOverallGrade = studentGrades.overall || '';
+    const studentSubjects = studentGrades.subjects || {};
+    const studentPoints = parseInt(studentGrades.points) || 0;
+
+    console.log(`Student: ${studentOverallGrade} overall, ${studentPoints} points, ${Object.keys(studentSubjects).length} subjects`);
+
+    const qualifiedCourses = courses.filter(course => {
+      console.log(`\nChecking course: ${course.name}`);
+      console.log('Course requirements:', course.requirements);
+      
+      if (!course.requirements) {
+        console.log('✅ Course has no requirements - student qualifies');
+        return true;
+      }
+
+      const courseReq = course.requirements;
+      let qualifies = true;
+      let reasons = [];
+
+      // 1. Check minimum points
+      if (courseReq.minPoints && courseReq.minPoints > 0) {
+        if (studentPoints < courseReq.minPoints) {
+          qualifies = false;
+          reasons.push(`Points too low: ${studentPoints} < required ${courseReq.minPoints}`);
+        } else {
+          reasons.push(`✅ Points met: ${studentPoints} >= ${courseReq.minPoints}`);
+        }
+      }
+
+      // 2. Check minimum grade
+      if (courseReq.minGrade) {
+        const studentGradeValue = qualificationUtils.gradeValues[studentOverallGrade] || 0;
+        const requiredGradeValue = qualificationUtils.gradeValues[courseReq.minGrade] || 0;
+        
+        if (studentGradeValue < requiredGradeValue) {
+          qualifies = false;
+          reasons.push(`Grade too low: ${studentOverallGrade} < required ${courseReq.minGrade}`);
+        } else {
+          reasons.push(`✅ Grade met: ${studentOverallGrade} >= ${courseReq.minGrade}`);
+        }
+      }
+
+      // 3. Check required subjects - FIXED: Support both 'subjects' and 'requiredSubjects'
+      const requiredSubjects = courseReq.subjects || courseReq.requiredSubjects;
+      if (requiredSubjects && requiredSubjects.length > 0) {
+        const missingSubjects = requiredSubjects.filter(subject => 
+          !studentSubjects.hasOwnProperty(subject)
+        );
+        
+        if (missingSubjects.length > 0) {
+          qualifies = false;
+          reasons.push(`Missing required subjects: ${missingSubjects.join(', ')}`);
+        } else {
+          reasons.push(`✅ All required subjects present`);
+        }
+      }
+
+      // 4. Check specific subject grades
+      if (courseReq.subjectGrades) {
+        for (const [subject, minGrade] of Object.entries(courseReq.subjectGrades)) {
+          const studentSubjectGrade = studentSubjects[subject];
+          if (!studentSubjectGrade) {
+            qualifies = false;
+            reasons.push(`Missing grade for required subject: ${subject}`);
+          } else {
+            const studentGradeValue = qualificationUtils.gradeValues[studentSubjectGrade] || 0;
+            const requiredGradeValue = qualificationUtils.gradeValues[minGrade] || 0;
+            
+            if (studentGradeValue < requiredGradeValue) {
+              qualifies = false;
+              reasons.push(`Grade too low for ${subject}: ${studentSubjectGrade} < required ${minGrade}`);
+            } else {
+              reasons.push(`✅ ${subject} grade met: ${studentSubjectGrade} >= ${minGrade}`);
+            }
+          }
+        }
+      }
+
+      console.log(`Course ${qualifies ? '✅ QUALIFIES' : '❌ DOES NOT QUALIFY'}:`, reasons);
+      return qualifies;
+    });
+
+    console.log(`✅ Found ${qualifiedCourses.length} qualified courses out of ${courses.length}`);
+    return qualifiedCourses;
+  },
+
+  /**
+   * Calculate match score for a job (0-100)
+   */
+  calculateJobMatchScore: (job, studentProfile) => {
+    if (!job.requirements || !studentProfile?.qualifications) {
+      return 0;
+    }
+
+    const jobReq = job.requirements;
+    const studentQual = studentProfile.qualifications;
+    let score = 0;
+    let totalWeight = 0;
+
+    // Education level (30% weight)
+    if (jobReq.educationalLevel || jobReq.educationLevel) {
+      totalWeight += 30;
+      const requiredLevel = jobReq.educationalLevel || jobReq.educationLevel;
+      const studentLevel = studentQual.educationLevel;
+      
+      const studentLevelValue = qualificationUtils.educationLevels[studentLevel]?.value || 0;
+      const requiredLevelValue = qualificationUtils.educationLevels[requiredLevel]?.value || 0;
+      
+      if (studentLevelValue >= requiredLevelValue) {
+        score += 30;
+      } else if (studentLevelValue >= requiredLevelValue - 1) {
+        score += 15; // Partial credit
+      }
+    }
+
+    // GPA (25% weight)
+    if (jobReq.minGPA && jobReq.minGPA > 0) {
+      totalWeight += 25;
+      const studentGPA = parseFloat(studentQual.gpa) || 0;
+      if (studentGPA >= jobReq.minGPA) {
+        score += 25;
+      } else if (studentGPA >= jobReq.minGPA - 0.5) {
+        score += 12; // Partial credit
+      }
+    }
+
+    // Experience (20% weight)
+    if (jobReq.minExperience) {
+      totalWeight += 20;
+      const studentExpValue = qualificationUtils.experienceLevels[studentQual.experience]?.value || 0;
+      const requiredExpValue = qualificationUtils.experienceLevels[jobReq.minExperience]?.value || 0;
+      
+      if (studentExpValue >= requiredExpValue) {
+        score += 20;
+      } else if (studentExpValue >= requiredExpValue - 1) {
+        score += 10; // Partial credit
+      }
+    }
+
+    // Degree type (15% weight)
+    if (jobReq.degreeType && studentQual.degreeType) {
+      totalWeight += 15;
+      if (jobReq.degreeType.toLowerCase() === studentQual.degreeType.toLowerCase()) {
+        score += 15;
+      }
+    }
+
+    // Skills (10% weight) - Simplified version
+    if (jobReq.requiredSkills && jobReq.requiredSkills.length > 0) {
+      totalWeight += 10;
+      const studentSkills = studentQual.skills || [];
+      const matchingSkills = jobReq.requiredSkills.filter(skill => 
+        studentSkills.includes(skill)
+      );
+      const skillMatch = (matchingSkills.length / jobReq.requiredSkills.length) * 10;
+      score += skillMatch;
+    }
+
+    return totalWeight > 0 ? Math.round((score / totalWeight) * 100) : 100;
+  },
+
+  /**
+   * Get qualification breakdown for display
+   */
   getQualificationBreakdown: (job, studentProfile) => {
     if (!job.requirements || !studentProfile?.qualifications) {
-      return []
+      return [];
     }
 
-    const jobReq = job.requirements
-    const studentQual = studentProfile.qualifications
-    const breakdown = []
+    const jobReq = job.requirements;
+    const studentQual = studentProfile.qualifications;
+    const breakdown = [];
+
+    // Education level
+    if (jobReq.educationalLevel || jobReq.educationLevel) {
+      const requiredLevel = jobReq.educationalLevel || jobReq.educationLevel;
+      const studentLevel = studentQual.educationLevel;
+      
+      const studentLevelValue = qualificationUtils.educationLevels[studentLevel]?.value || 0;
+      const requiredLevelValue = qualificationUtils.educationLevels[requiredLevel]?.value || 0;
+      
+      breakdown.push({
+        requirement: `Education: ${qualificationUtils.educationLevels[requiredLevel]?.label || requiredLevel}`,
+        studentValue: qualificationUtils.educationLevels[studentLevel]?.label || studentLevel || 'Not specified',
+        meets: studentLevelValue >= requiredLevelValue,
+        type: 'education'
+      });
+    }
 
     // GPA
-    if (jobReq.minGPA) {
-      const meets = studentQual.gpa && studentQual.gpa >= jobReq.minGPA
+    if (jobReq.minGPA && jobReq.minGPA > 0) {
+      const studentGPA = parseFloat(studentQual.gpa) || 0;
       breakdown.push({
         requirement: `Minimum GPA: ${jobReq.minGPA}`,
-        studentValue: studentQual.gpa || 'Not provided',
-        meets,
+        studentValue: studentGPA > 0 ? studentGPA.toFixed(1) : 'Not specified',
+        meets: studentGPA >= jobReq.minGPA,
         type: 'gpa'
-      })
-    }
-
-    // Education Level
-    if (jobReq.educationLevel) {
-      const educationHierarchy = {
-        'high_school': 1, 'associate': 2, 'bachelor': 3, 'master': 4, 'phd': 5
-      }
-      const studentLevel = educationHierarchy[studentQual.educationLevel] || 0
-      const requiredLevel = educationHierarchy[jobReq.educationLevel] || 0
-      const meets = studentLevel >= requiredLevel
-      
-      breakdown.push({
-        requirement: `Education: ${this.formatEducationLevel(jobReq.educationLevel)}`,
-        studentValue: this.formatEducationLevel(studentQual.educationLevel) || 'Not provided',
-        meets,
-        type: 'education'
-      })
-    }
-
-    // Degree Type
-    if (jobReq.degreeType) {
-      const meets = studentQual.degreeType && 
-                   studentQual.degreeType.toLowerCase() === jobReq.degreeType.toLowerCase()
-      breakdown.push({
-        requirement: `Degree in: ${jobReq.degreeType}`,
-        studentValue: studentQual.degreeType || 'Not provided',
-        meets,
-        type: 'degree'
-      })
-    }
-
-    // Certificates
-    if (jobReq.requiredCertificates && jobReq.requiredCertificates.length > 0) {
-      const studentCerts = studentQual.certificates || []
-      const missingCerts = jobReq.requiredCertificates.filter(cert => 
-        !studentCerts.includes(cert)
-      )
-      const meets = missingCerts.length === 0
-      
-      breakdown.push({
-        requirement: `Certificates: ${jobReq.requiredCertificates.join(', ')}`,
-        studentValue: studentCerts.length > 0 ? studentCerts.join(', ') : 'None',
-        meets,
-        type: 'certificates'
-      })
-    }
-
-    // Skills
-    if (jobReq.requiredSkills && jobReq.requiredSkills.length > 0) {
-      const studentSkills = studentQual.skills || []
-      const matchingSkills = jobReq.requiredSkills.filter(skill =>
-        studentSkills.includes(skill)
-      )
-      const matchPercentage = (matchingSkills.length / jobReq.requiredSkills.length) * 100
-      const meets = matchPercentage >= 60
-      
-      breakdown.push({
-        requirement: `Skills: ${jobReq.requiredSkills.join(', ')}`,
-        studentValue: `${matchingSkills.length}/${jobReq.requiredSkills.length} skills (${matchPercentage.toFixed(0)}%)`,
-        meets,
-        type: 'skills'
-      })
+      });
     }
 
     // Experience
     if (jobReq.minExperience) {
-      const experienceHierarchy = {
-        'no_experience': 1, 'internship': 2, 'entry_level': 3, 
-        'mid_level': 4, 'senior_level': 5, 'executive': 6
-      }
-      const studentExp = experienceHierarchy[studentQual.experience] || 0
-      const requiredExp = experienceHierarchy[jobReq.minExperience] || 0
-      const meets = studentExp >= requiredExp
+      const studentExpValue = qualificationUtils.experienceLevels[studentQual.experience]?.value || 0;
+      const requiredExpValue = qualificationUtils.experienceLevels[jobReq.minExperience]?.value || 0;
       
       breakdown.push({
-        requirement: `Experience: ${this.formatExperience(jobReq.minExperience)}`,
-        studentValue: this.formatExperience(studentQual.experience) || 'Not provided',
-        meets,
+        requirement: `Experience: ${qualificationUtils.experienceLevels[jobReq.minExperience]?.label || jobReq.minExperience}`,
+        studentValue: qualificationUtils.experienceLevels[studentQual.experience]?.label || studentQual.experience || 'Not specified',
+        meets: studentExpValue >= requiredExpValue,
         type: 'experience'
-      })
+      });
     }
 
-    // Documents
-    if (jobReq.requiredDocuments && jobReq.requiredDocuments.length > 0) {
-      const studentDocs = studentQual.documents || {}
-      const missingDocs = jobReq.requiredDocuments.filter(doc => !studentDocs[doc])
-      const meets = missingDocs.length === 0
-      
-      breakdown.push({
-        requirement: `Documents: ${jobReq.requiredDocuments.map(doc => 
-          doc.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
-        ).join(', ')}`,
-        studentValue: `${jobReq.requiredDocuments.length - missingDocs.length}/${jobReq.requiredDocuments.length} documents`,
-        meets,
-        type: 'documents'
-      })
-    }
-
-    return breakdown
+    return breakdown;
   },
 
-  // Helper function to format education level for display
-  formatEducationLevel: (level) => {
-    const levels = {
-      'high_school': 'High School Diploma',
-      'associate': 'Associate Degree',
-      'bachelor': "Bachelor's Degree",
-      'master': "Master's Degree",
-      'phd': 'PhD'
-    }
-    return levels[level] || level
-  },
-
-  // Helper function to format experience for display
-  formatExperience: (experience) => {
-    const experiences = {
-      'no_experience': 'No Experience',
-      'internship': 'Internship',
-      'entry_level': 'Entry Level (0-2 years)',
-      'mid_level': 'Mid Level (2-5 years)',
-      'senior_level': 'Senior Level (5+ years)',
-      'executive': 'Executive'
-    }
-    return experiences[experience] || experience
-  },
-
-  // Filter jobs by qualification
-  filterQualifiedJobs: (jobs, studentProfile) => {
-    return jobs.filter(job => {
-      const qualification = this.checkJobQualification(job, studentProfile)
-      return qualification.qualified
-    })
-  },
-
-  // Sort jobs by match score
+  /**
+   * Sort jobs by match score
+   */
   sortJobsByMatchScore: (jobs, studentProfile) => {
-    return jobs.map(job => {
-      const qualification = this.checkJobQualification(job, studentProfile)
-      return {
-        ...job,
-        matchScore: qualification.matchScore,
-        qualificationReasons: qualification.reasons
-      }
-    }).sort((a, b) => b.matchScore - a.matchScore)
+    return jobs.map(job => ({
+      ...job,
+      matchScore: qualificationUtils.calculateJobMatchScore(job, studentProfile)
+    })).sort((a, b) => b.matchScore - a.matchScore);
   }
-}
+};
 
-export default qualificationUtils
+export default qualificationUtils;

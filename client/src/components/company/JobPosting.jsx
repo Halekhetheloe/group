@@ -3,10 +3,10 @@ import { collection, addDoc } from 'firebase/firestore'
 import { db } from '../../firebase-config'
 import { useAuth } from '../../hooks/useAuth'
 import toast from 'react-hot-toast'
-import { Plus, X, BookOpen, Award, GraduationCap, Briefcase } from 'lucide-react'
 
 const JobPosting = () => {
   const { userData } = useAuth()
+  const [activeSection, setActiveSection] = useState('basic')
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -14,18 +14,12 @@ const JobPosting = () => {
     location: '',
     salary: '',
     deadline: '',
+    // SIMPLIFIED: Only educational level and GPA requirements
     requirements: {
-      minGPA: '',
       educationLevel: '',
-      requiredCertificates: [],
-      requiredSkills: [],
-      minExperience: '',
-      degreeType: '',
-      requiredDocuments: []
+      minGPA: ''
     }
   })
-  const [currentCertificate, setCurrentCertificate] = useState('')
-  const [currentSkill, setCurrentSkill] = useState('')
   const [loading, setLoading] = useState(false)
 
   const educationLevels = [
@@ -36,42 +30,12 @@ const JobPosting = () => {
     { value: 'phd', label: 'PhD' }
   ]
 
-  const degreeTypes = [
-    'Computer Science',
-    'Engineering',
-    'Business Administration',
-    'Medicine',
-    'Law',
-    'Arts',
-    'Sciences',
-    'Education',
-    'Other'
-  ]
-
   const jobTypes = [
     'full-time',
     'part-time',
     'contract',
     'internship',
     'remote'
-  ]
-
-  const experienceLevels = [
-    'no_experience',
-    'internship',
-    'entry_level',
-    'mid_level',
-    'senior_level',
-    'executive'
-  ]
-
-  const documentTypes = [
-    'transcript',
-    'diploma',
-    'certificate',
-    'portfolio',
-    'recommendation_letter',
-    'cover_letter'
   ]
 
   const handleInputChange = (e) => {
@@ -92,47 +56,6 @@ const JobPosting = () => {
     }))
   }
 
-  const addCertificate = () => {
-    if (currentCertificate.trim() && !formData.requirements.requiredCertificates.includes(currentCertificate.trim())) {
-      handleRequirementsChange('requiredCertificates', [
-        ...formData.requirements.requiredCertificates,
-        currentCertificate.trim()
-      ])
-      setCurrentCertificate('')
-    }
-  }
-
-  const removeCertificate = (certificate) => {
-    handleRequirementsChange('requiredCertificates', 
-      formData.requirements.requiredCertificates.filter(c => c !== certificate)
-    )
-  }
-
-  const addSkill = () => {
-    if (currentSkill.trim() && !formData.requirements.requiredSkills.includes(currentSkill.trim())) {
-      handleRequirementsChange('requiredSkills', [
-        ...formData.requirements.requiredSkills,
-        currentSkill.trim()
-      ])
-      setCurrentSkill('')
-    }
-  }
-
-  const removeSkill = (skill) => {
-    handleRequirementsChange('requiredSkills', 
-      formData.requirements.requiredSkills.filter(s => s !== skill)
-    )
-  }
-
-  const toggleDocument = (document) => {
-    const currentDocs = formData.requirements.requiredDocuments
-    const newDocs = currentDocs.includes(document)
-      ? currentDocs.filter(d => d !== document)
-      : [...currentDocs, document]
-    
-    handleRequirementsChange('requiredDocuments', newDocs)
-  }
-
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
@@ -145,27 +68,26 @@ const JobPosting = () => {
       }
 
       const jobData = {
-        ...formData,
+        title: formData.title,
+        description: formData.description,
+        type: formData.jobType,
+        location: formData.location,
+        salary: formData.salary,
+        applicationDeadline: formData.deadline,
         companyId: userData.uid,
         companyName: userData.displayName || userData.companyName,
         status: 'active',
         createdAt: new Date(),
-        applications: 0,
-        // Ensure requirements are properly formatted
+        // SIMPLIFIED: Only educational level and GPA requirements
         requirements: {
-          minGPA: formData.requirements.minGPA ? parseFloat(formData.requirements.minGPA) : null,
-          educationLevel: formData.requirements.educationLevel || null,
-          requiredCertificates: formData.requirements.requiredCertificates,
-          requiredSkills: formData.requirements.requiredSkills,
-          minExperience: formData.requirements.minExperience || null,
-          degreeType: formData.requirements.degreeType || null,
-          requiredDocuments: formData.requirements.requiredDocuments
+          educationalLevel: formData.requirements.educationLevel || '',
+          minGPA: formData.requirements.minGPA ? parseFloat(formData.requirements.minGPA) : 0
         }
       }
 
       await addDoc(collection(db, 'jobs'), jobData)
       
-      toast.success('Job posted successfully!')
+      toast.success('Job posted successfully! Only students meeting your educational requirements will see this job.')
       
       // Reset form
       setFormData({
@@ -176,15 +98,11 @@ const JobPosting = () => {
         salary: '',
         deadline: '',
         requirements: {
-          minGPA: '',
           educationLevel: '',
-          requiredCertificates: [],
-          requiredSkills: [],
-          minExperience: '',
-          degreeType: '',
-          requiredDocuments: []
+          minGPA: ''
         }
       })
+      setActiveSection('basic')
       
     } catch (error) {
       console.error('Error posting job:', error)
@@ -194,333 +112,279 @@ const JobPosting = () => {
     }
   }
 
+  const SectionButton = ({ id, title, isActive }) => (
+    <button
+      type="button"
+      onClick={() => setActiveSection(id)}
+      className={`flex items-center space-x-3 px-6 py-4 w-full text-left rounded-lg transition-all duration-200 ${
+        isActive 
+          ? 'bg-blue-600 text-white shadow-lg transform -translate-y-1' 
+          : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+      }`}
+    >
+      <span className="font-medium">{title}</span>
+    </button>
+  )
+
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
       <div className="max-w-4xl mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Post a New Job</h1>
           <p className="text-gray-600 mt-2">
-            Create a job posting with specific requirements to find qualified candidates
+            Create a job posting - students will only see jobs that match their educational qualifications
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Basic Job Information */}
-          <div className="card">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Basic Job Information</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Job Title *
-                </label>
-                <input
-                  type="text"
-                  name="title"
-                  value={formData.title}
-                  onChange={handleInputChange}
-                  className="input-field"
-                  placeholder="e.g., Software Engineer"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Job Type *
-                </label>
-                <select
-                  name="jobType"
-                  value={formData.jobType}
-                  onChange={handleInputChange}
-                  className="input-field"
-                >
-                  {jobTypes.map(type => (
-                    <option key={type} value={type}>
-                      {type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Location *
-                </label>
-                <input
-                  type="text"
-                  name="location"
-                  value={formData.location}
-                  onChange={handleInputChange}
-                  className="input-field"
-                  placeholder="e.g., Maseru, Lesotho"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Salary Range
-                </label>
-                <input
-                  type="text"
-                  name="salary"
-                  value={formData.salary}
-                  onChange={handleInputChange}
-                  className="input-field"
-                  placeholder="e.g., M5000 - M8000"
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Job Description *
-                </label>
-                <textarea
-                  name="description"
-                  value={formData.description}
-                  onChange={handleInputChange}
-                  rows={6}
-                  className="input-field"
-                  placeholder="Describe the job responsibilities, expectations, and what makes your company great..."
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Application Deadline
-                </label>
-                <input
-                  type="date"
-                  name="deadline"
-                  value={formData.deadline}
-                  onChange={handleInputChange}
-                  className="input-field"
-                  min={new Date().toISOString().split('T')[0]}
-                />
-              </div>
-            </div>
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Sidebar Navigation */}
+          <div className="lg:col-span-1 space-y-3">
+            <SectionButton
+              id="basic"
+              title="Job Details"
+              isActive={activeSection === 'basic'}
+            />
+            <SectionButton
+              id="requirements"
+              title="Qualifications"
+              isActive={activeSection === 'requirements'}
+            />
           </div>
 
-          {/* Academic Requirements */}
-          <div className="card">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-              <GraduationCap className="h-5 w-5 mr-2 text-blue-600" />
-              Academic Requirements
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Minimum GPA
-                </label>
-                <input
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  max="4.0"
-                  value={formData.requirements.minGPA}
-                  onChange={(e) => handleRequirementsChange('minGPA', e.target.value)}
-                  className="input-field"
-                  placeholder="e.g., 3.0"
-                />
-                <p className="text-xs text-gray-500 mt-1">Leave empty if no GPA requirement</p>
-              </div>
+          {/* Main Content */}
+          <div className="lg:col-span-3">
+            <form onSubmit={handleSubmit}>
+              <div className="bg-white rounded-2xl shadow-xl p-6">
+                {/* Basic Information */}
+                {activeSection === 'basic' && (
+                  <div className="space-y-6">
+                    <h2 className="text-2xl font-bold text-gray-900 mb-6">Job Details</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Job Title *
+                        </label>
+                        <input
+                          type="text"
+                          name="title"
+                          value={formData.title}
+                          onChange={handleInputChange}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                          placeholder="e.g., Software Engineer"
+                          required
+                        />
+                      </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Minimum Education Level
-                </label>
-                <select
-                  value={formData.requirements.educationLevel}
-                  onChange={(e) => handleRequirementsChange('educationLevel', e.target.value)}
-                  className="input-field"
-                >
-                  <option value="">Any Education Level</option>
-                  {educationLevels.map(level => (
-                    <option key={level.value} value={level.value}>
-                      {level.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Job Type *
+                        </label>
+                        <select
+                          name="jobType"
+                          value={formData.jobType}
+                          onChange={handleInputChange}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                        >
+                          {jobTypes.map(type => (
+                            <option key={type} value={type}>
+                              {type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Required Degree Type
-                </label>
-                <select
-                  value={formData.requirements.degreeType}
-                  onChange={(e) => handleRequirementsChange('degreeType', e.target.value)}
-                  className="input-field"
-                >
-                  <option value="">Any Degree Type</option>
-                  {degreeTypes.map(degree => (
-                    <option key={degree} value={degree}>
-                      {degree}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Location *
+                        </label>
+                        <input
+                          type="text"
+                          name="location"
+                          value={formData.location}
+                          onChange={handleInputChange}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                          placeholder="e.g., Maseru, Lesotho"
+                          required
+                        />
+                      </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Experience Level
-                </label>
-                <select
-                  value={formData.requirements.minExperience}
-                  onChange={(e) => handleRequirementsChange('minExperience', e.target.value)}
-                  className="input-field"
-                >
-                  <option value="">Any Experience Level</option>
-                  {experienceLevels.map(exp => (
-                    <option key={exp} value={exp}>
-                      {exp.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Salary Range
+                        </label>
+                        <input
+                          type="text"
+                          name="salary"
+                          value={formData.salary}
+                          onChange={handleInputChange}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                          placeholder="e.g., M5000 - M8000"
+                        />
+                      </div>
 
-          {/* Certificates & Skills */}
-          <div className="card">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-              <Award className="h-5 w-5 mr-2 text-green-600" />
-              Certificates & Skills
-            </h2>
-            
-            {/* Required Certificates */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Required Certificates
-              </label>
-              <div className="flex gap-2 mb-3">
-                <input
-                  type="text"
-                  value={currentCertificate}
-                  onChange={(e) => setCurrentCertificate(e.target.value)}
-                  className="input-field flex-1"
-                  placeholder="e.g., AWS Certified, PMP, etc."
-                  onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addCertificate())}
-                />
-                <button
-                  type="button"
-                  onClick={addCertificate}
-                  className="btn-primary whitespace-nowrap"
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {formData.requirements.requiredCertificates.map((certificate, index) => (
-                  <span
-                    key={index}
-                    className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800"
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Job Description *
+                        </label>
+                        <textarea
+                          name="description"
+                          value={formData.description}
+                          onChange={handleInputChange}
+                          rows={6}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                          placeholder="Describe the job responsibilities, expectations, and what makes your company great..."
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Application Deadline
+                        </label>
+                        <input
+                          type="date"
+                          name="deadline"
+                          value={formData.deadline}
+                          onChange={handleInputChange}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                          min={new Date().toISOString().split('T')[0]}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Educational Requirements */}
+                {activeSection === 'requirements' && (
+                  <div className="space-y-6">
+                    <h2 className="text-2xl font-bold text-gray-900 mb-6">Educational Requirements</h2>
+                    <p className="text-gray-600 mb-6">
+                      Set the minimum educational qualifications. Only students meeting these requirements will see this job.
+                    </p>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Minimum Education Level
+                        </label>
+                        <select
+                          value={formData.requirements.educationLevel}
+                          onChange={(e) => handleRequirementsChange('educationLevel', e.target.value)}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                        >
+                          <option value="">No Minimum (Any Education Level)</option>
+                          {educationLevels.map(level => (
+                            <option key={level.value} value={level.value}>
+                              {level.label}
+                            </option>
+                          ))}
+                        </select>
+                        <p className="text-sm text-gray-500 mt-2">
+                          Students must have this education level or higher
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Minimum GPA (4.0 scale)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          max="4.0"
+                          value={formData.requirements.minGPA}
+                          onChange={(e) => handleRequirementsChange('minGPA', e.target.value)}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                          placeholder="e.g., 3.0"
+                        />
+                        <p className="text-sm text-gray-500 mt-2">
+                          Students must have at least this GPA
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Requirements Preview */}
+                    <div className="mt-8 p-6 bg-blue-50 rounded-lg border border-blue-200">
+                      <h3 className="text-lg font-semibold text-blue-900 mb-4">Qualification Preview</h3>
+                      <div className="space-y-3">
+                        <div className="flex items-center">
+                          <div className="w-3 h-3 bg-blue-500 rounded-full mr-3"></div>
+                          <div>
+                            <p className="font-medium text-blue-800">Education Level</p>
+                            <p className="text-sm text-blue-600">
+                              {formData.requirements.educationLevel 
+                                ? educationLevels.find(l => l.value === formData.requirements.educationLevel)?.label 
+                                : 'Any education level accepted'
+                              }
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center">
+                          <div className="w-3 h-3 bg-blue-500 rounded-full mr-3"></div>
+                          <div>
+                            <p className="font-medium text-blue-800">Minimum GPA</p>
+                            <p className="text-sm text-blue-600">
+                              {formData.requirements.minGPA 
+                                ? `${formData.requirements.minGPA} or higher` 
+                                : 'No GPA requirement'
+                              }
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <p className="text-sm text-blue-700 mt-4">
+                        Students will only see this job if they meet ALL the requirements above.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Navigation Buttons */}
+                <div className="flex justify-between pt-8 mt-8 border-t border-gray-200">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const sections = ['basic', 'requirements']
+                      const currentIndex = sections.indexOf(activeSection)
+                      if (currentIndex > 0) {
+                        setActiveSection(sections[currentIndex - 1])
+                      }
+                    }}
+                    className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors duration-200"
+                    disabled={activeSection === 'basic'}
                   >
-                    {certificate}
+                    Previous
+                  </button>
+                  
+                  {activeSection === 'requirements' ? (
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-8 py-3 rounded-lg font-semibold transition-all duration-200 transform hover:scale-105 shadow-lg"
+                    >
+                      {loading ? 'Posting Job...' : 'Post Job'}
+                    </button>
+                  ) : (
                     <button
                       type="button"
-                      onClick={() => removeCertificate(certificate)}
-                      className="ml-2 hover:text-blue-600"
+                      onClick={() => {
+                        const sections = ['basic', 'requirements']
+                        const currentIndex = sections.indexOf(activeSection)
+                        if (currentIndex < sections.length - 1) {
+                          setActiveSection(sections[currentIndex + 1])
+                        }
+                      }}
+                      className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors duration-200"
                     >
-                      <X className="h-3 w-3" />
+                      Next
                     </button>
-                  </span>
-                ))}
+                  )}
+                </div>
               </div>
-            </div>
-
-            {/* Required Skills */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Required Skills
-              </label>
-              <div className="flex gap-2 mb-3">
-                <input
-                  type="text"
-                  value={currentSkill}
-                  onChange={(e) => setCurrentSkill(e.target.value)}
-                  className="input-field flex-1"
-                  placeholder="e.g., JavaScript, Python, Project Management"
-                  onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addSkill())}
-                />
-                <button
-                  type="button"
-                  onClick={addSkill}
-                  className="btn-primary whitespace-nowrap"
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {formData.requirements.requiredSkills.map((skill, index) => (
-                  <span
-                    key={index}
-                    className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-green-100 text-green-800"
-                  >
-                    {skill}
-                    <button
-                      type="button"
-                      onClick={() => removeSkill(skill)}
-                      className="ml-2 hover:text-green-600"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            </div>
+            </form>
           </div>
-
-          {/* Required Documents */}
-          <div className="card">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-              <BookOpen className="h-5 w-5 mr-2 text-purple-600" />
-              Required Documents
-            </h2>
-            <p className="text-sm text-gray-600 mb-4">
-              Select which documents applicants must provide
-            </p>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {documentTypes.map(doc => (
-                <label key={doc} className="flex items-center space-x-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.requirements.requiredDocuments.includes(doc)}
-                    onChange={() => toggleDocument(doc)}
-                    className="h-4 w-4 text-blue-600 rounded"
-                  />
-                  <span className="text-sm text-gray-700 capitalize">
-                    {doc.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                  </span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {/* Submit Button */}
-          <div className="flex justify-end">
-            <button
-              type="submit"
-              disabled={loading}
-              className="btn-primary text-lg px-8 py-3"
-            >
-              {loading ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
-                  Posting Job...
-                </>
-              ) : (
-                <>
-                  <Briefcase className="h-5 w-5 mr-2" />
-                  Post Job
-                </>
-              )}
-            </button>
-          </div>
-        </form>
+        </div>
       </div>
     </div>
   )

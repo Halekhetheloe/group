@@ -10,12 +10,15 @@ class Course {
     this.faculty = data.faculty;
     this.duration = data.duration;
     this.description = data.description;
-    this.requirements = data.requirements || {
-      minGrade: data.requirements?.minGrade || null,
-      minPoints: data.requirements?.minPoints || null,
-      subjects: data.requirements?.subjects || [],
-      certificates: data.requirements?.certificates || []
+    
+    // SIMPLIFIED: Only grades and points requirements
+    this.requirements = {
+      minGrade: data.requirements?.minGrade || null, // A, B, C, D
+      minPoints: data.requirements?.minPoints || null, // Numeric points
+      subjects: data.requirements?.subjects || [], // Required subjects
+      ...data.requirements
     };
+    
     this.curriculum = data.curriculum || [];
     this.intake = data.intake || {};
     this.fees = data.fees || {};
@@ -25,7 +28,237 @@ class Course {
     this.updatedAt = data.updatedAt || new Date();
   }
 
-  // ... existing static methods ...
+  // Static method to create a new course
+  static async create(courseData) {
+    try {
+      const courseRef = db.collection(collections.COURSES).doc(courseData.id);
+      const course = new Course({
+        ...courseData,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+
+      await courseRef.set(course.toFirestore());
+      return course;
+    } catch (error) {
+      throw new Error(`Failed to create course: ${error.message}`);
+    }
+  }
+
+  // Static method to find course by ID
+  static async findById(courseId) {
+    try {
+      const courseDoc = await db.collection(collections.COURSES).doc(courseId).get();
+      
+      if (!courseDoc.exists) {
+        return null;
+      }
+
+      return new Course({
+        id: courseDoc.id,
+        ...courseDoc.data()
+      });
+    } catch (error) {
+      throw new Error(`Failed to find course: ${error.message}`);
+    }
+  }
+
+  // Static method to find courses with filtering
+  static async find(filter = {}, options = {}) {
+    try {
+      const { 
+        institution, 
+        faculty, 
+        search,
+        status = 'active',
+        page = 1, 
+        limit = 10 
+      } = filter;
+
+      let query = db.collection(collections.COURSES);
+
+      // Apply filters
+      if (institution) {
+        query = query.where('institutionId', '==', institution);
+      }
+
+      if (faculty) {
+        query = query.where('faculty', '==', faculty);
+      }
+
+      if (status) {
+        query = query.where('status', '==', status);
+      }
+
+      if (search) {
+        query = query.where('name', '>=', search).where('name', '<=', search + '\uf8ff');
+      }
+
+      // Get total count
+      const countSnapshot = await query.get();
+      const total = countSnapshot.size;
+
+      // Apply pagination
+      const startAfter = (page - 1) * limit;
+      const snapshot = await query
+        .orderBy('createdAt', 'desc')
+        .offset(startAfter)
+        .limit(limit)
+        .get();
+
+      const courses = [];
+      snapshot.forEach(doc => {
+        courses.push(new Course({
+          id: doc.id,
+          ...doc.data()
+        }));
+      });
+
+      return {
+        courses,
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit)
+        }
+      };
+    } catch (error) {
+      throw new Error(`Failed to find courses: ${error.message}`);
+    }
+  }
+
+  // NEW: Static method to find courses qualified for a student
+  static async findQualifiedForStudent(studentProfile, options = {}) {
+    try {
+      const { page = 1, limit = 10 } = options;
+
+      // Get all active courses
+      let query = db.collection(collections.COURSES)
+        .where('status', '==', 'active');
+
+      const snapshot = await query
+        .orderBy('createdAt', 'desc')
+        .get();
+
+      const allCourses = [];
+      snapshot.forEach(doc => {
+        allCourses.push(new Course({
+          id: doc.id,
+          ...doc.data()
+        }));
+      });
+
+      // Filter courses based on student grades
+      const qualifiedCourses = allCourses.filter(course => {
+        return course.checkStudentQualification(studentProfile);
+      });
+
+      // Apply pagination
+      const startIndex = (page - 1) * limit;
+      const paginatedCourses = qualifiedCourses.slice(startIndex, startIndex + limit);
+
+      return {
+        courses: paginatedCourses,
+        pagination: {
+          page,
+          limit,
+          total: qualifiedCourses.length,
+          pages: Math.ceil(qualifiedCourses.length / limit)
+        }
+      };
+    } catch (error) {
+      throw new Error(`Failed to find qualified courses: ${error.message}`);
+    }
+  }
+
+  // NEW: Check if student qualifies for this course
+  checkStudentQualification(studentProfile) {
+    const studentEducation = studentProfile?.qualifications || {};
+    const studentGrades = studentEducation.grades || {};
+    
+    const studentOverallGrade = studentGrades.overall || '';
+    const studentSubjects = studentGrades.subjects || {};
+    const studentPoints = studentGrades.points || 0;
+
+    // Check minimum grade
+    if (this.requirements.minGrade) {
+      const gradeOrder = { 'A': 4, 'B': 3, 'C': 2, 'D': 1 };
+      const studentGradeValue = gradeOrder[studentOverallGrade] || 0;
+      const requiredGradeValue = gradeOrder[this.requirements.minGrade] || 0;
+      
+      if (studentGradeValue < requiredGradeValue) {
+        return false;
+      }
+    }
+
+    // Check minimum points
+    if (this.requirements.minPoints && studentPoints < this.requirements.minPoints) {
+      return false;
+    }
+
+    // Check required subjects
+    if (this.requirements.subjects && this.requirements.subjects.length > 0) {
+      const hasAllSubjects = this.requirements.subjects.every(subject => 
+        studentSubjects.hasOwnProperty(subject)
+      );
+      
+      if (!hasAllSubjects) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  // NEW: Get qualification breakdown for display
+  getQualificationBreakdown(studentProfile) {
+    const studentEducation = studentProfile?.qualifications || {};
+    const studentGrades = studentEducation.grades || {};
+    
+    const studentOverallGrade = studentGrades.overall || '';
+    const studentSubjects = studentGrades.subjects || {};
+    const studentPoints = studentGrades.points || 0;
+
+    const breakdown = [];
+
+    // Minimum grade check
+    if (this.requirements.minGrade) {
+      const gradeOrder = { 'A': 4, 'B': 3, 'C': 2, 'D': 1 };
+      const studentGradeValue = gradeOrder[studentOverallGrade] || 0;
+      const requiredGradeValue = gradeOrder[this.requirements.minGrade] || 0;
+      
+      breakdown.push({
+        requirement: `Minimum Grade: ${this.requirements.minGrade}`,
+        studentValue: studentOverallGrade || 'Not specified',
+        meets: studentGradeValue >= requiredGradeValue
+      });
+    }
+
+    // Minimum points check
+    if (this.requirements.minPoints) {
+      breakdown.push({
+        requirement: `Minimum Points: ${this.requirements.minPoints}`,
+        studentValue: studentPoints > 0 ? studentPoints.toString() : 'Not specified',
+        meets: studentPoints >= this.requirements.minPoints
+      });
+    }
+
+    // Required subjects check
+    if (this.requirements.subjects && this.requirements.subjects.length > 0) {
+      const missingSubjects = this.requirements.subjects.filter(subject => 
+        !studentSubjects.hasOwnProperty(subject)
+      );
+      
+      breakdown.push({
+        requirement: `Required Subjects: ${this.requirements.subjects.join(', ')}`,
+        studentValue: Object.keys(studentSubjects).length > 0 ? Object.keys(studentSubjects).join(', ') : 'No subjects specified',
+        meets: missingSubjects.length === 0
+      });
+    }
+
+    return breakdown;
+  }
 
   // Check course eligibility for a student
   async checkEligibility(studentId) {
@@ -37,149 +270,71 @@ class Course {
       }
 
       const studentData = studentDoc.data();
-      const studentGrades = studentData.grades || studentData.academicRecords;
+      const studentProfile = studentData.qualifications || {};
 
-      if (!studentGrades) {
-        return {
-          eligible: false,
-          missingRequirements: ['No grade information available'],
-          meetsRequirements: []
-        };
-      }
-
-      return this.checkEligibilityWithGrades(studentGrades);
+      return this.checkStudentQualification(studentProfile);
     } catch (error) {
       console.error('Error checking course eligibility:', error);
       throw error;
     }
   }
 
-  // Check eligibility with provided grades
-  checkEligibilityWithGrades(studentGrades) {
-    const eligibility = {
-      eligible: true,
-      missingRequirements: [],
-      meetsRequirements: [],
-      suggestions: []
-    };
-
-    // Check minimum grade requirement
-    if (this.requirements.minGrade) {
-      const gradeOrder = { 'A': 5, 'B': 4, 'C': 3, 'D': 2, 'E': 1, 'F': 0 };
-      const studentOverallGrade = studentGrades.overall || 'F';
-      
-      if (gradeOrder[studentOverallGrade] < gradeOrder[this.requirements.minGrade]) {
-        eligibility.eligible = false;
-        eligibility.missingRequirements.push(`Minimum grade of ${this.requirements.minGrade} required (your grade: ${studentOverallGrade})`);
-      } else {
-        eligibility.meetsRequirements.push(`Meets grade requirement (${this.requirements.minGrade})`);
-      }
-    }
-
-    // Check subject requirements
-    if (this.requirements.subjects && this.requirements.subjects.length > 0) {
-      const missingSubjects = this.requirements.subjects.filter(subject => 
-        !studentGrades.subjects || !studentGrades.subjects[subject]
-      );
-
-      if (missingSubjects.length > 0) {
-        eligibility.eligible = false;
-        eligibility.missingRequirements.push(`Missing required subjects: ${missingSubjects.join(', ')}`);
-      } else {
-        eligibility.meetsRequirements.push('Meets all subject requirements');
-      }
-    }
-
-    // Check minimum points
-    if (this.requirements.minPoints) {
-      const studentPoints = studentGrades.points || 0;
-      if (studentPoints < this.requirements.minPoints) {
-        eligibility.eligible = false;
-        eligibility.missingRequirements.push(`Minimum ${this.requirements.minPoints} points required (your points: ${studentPoints})`);
-      } else {
-        eligibility.meetsRequirements.push(`Meets points requirement (${this.requirements.minPoints})`);
-      }
-    }
-
-    // Provide suggestions if not eligible
-    if (!eligibility.eligible) {
-      eligibility.suggestions.push(
-        'Consider improving your grades in the required subjects',
-        'Explore alternative courses with lower requirements',
-        'Contact the institution for special consideration'
-      );
-    }
-
-    return eligibility;
-  }
-
-  // Get similar eligible courses for a student
-  static async getSimilarEligibleCourses(courseId, studentId, limit = 4) {
+  // Update course
+  async update(updateData) {
     try {
-      // Get current course
-      const currentCourse = await Course.findById(courseId);
-      if (!currentCourse) {
-        throw new Error('Course not found');
-      }
+      const courseRef = db.collection(collections.COURSES).doc(this.id);
+      
+      const updatedData = {
+        ...updateData,
+        updatedAt: new Date()
+      };
 
-      // Get student grades
-      const studentDoc = await db.collection(collections.USERS).doc(studentId).get();
-      const studentData = studentDoc.data();
-      const studentGrades = studentData.grades || studentData.academicRecords;
+      await courseRef.update(updatedData);
 
-      // Get courses from same institution and faculty
-      const snapshot = await db.collection(collections.COURSES)
-        .where('institutionId', '==', currentCourse.institutionId)
-        .where('faculty', '==', currentCourse.faculty)
-        .where('status', '==', 'active')
-        .where('id', '!=', courseId)
-        .limit(limit * 2) // Get more to filter by eligibility
-        .get();
-
-      const similarCourses = [];
-
-      for (const doc of snapshot.docs) {
-        const courseData = doc.data();
-        const course = new Course({
-          id: doc.id,
-          ...courseData
-        });
-
-        // Check eligibility if student grades are available
-        if (studentGrades) {
-          const eligibility = course.checkEligibilityWithGrades(studentGrades);
-          if (eligibility.eligible) {
-            similarCourses.push({
-              id: course.id,
-              name: course.name,
-              faculty: course.faculty,
-              duration: course.duration,
-              eligibility
-            });
-          }
-        } else {
-          // Include all courses if no grades available
-          similarCourses.push({
-            id: course.id,
-            name: course.name,
-            faculty: course.faculty,
-            duration: course.duration
-          });
-        }
-
-        if (similarCourses.length >= limit) break;
-      }
-
-      return similarCourses;
+      // Update instance properties
+      Object.assign(this, updatedData);
+      
+      return this;
     } catch (error) {
-      throw new Error(`Failed to get similar courses: ${error.message}`);
+      throw new Error(`Failed to update course: ${error.message}`);
     }
   }
 
-  // ... rest of existing methods ...
+  // Update course status
+  async updateStatus(status) {
+    try {
+      return await this.update({
+        status,
+        updatedAt: new Date()
+      });
+    } catch (error) {
+      throw new Error(`Failed to update course status: ${error.message}`);
+    }
+  }
 
   // Convert to plain object
   toObject() {
+    return {
+      id: this.id,
+      name: this.name,
+      institutionId: this.institutionId,
+      institutionName: this.institutionName,
+      faculty: this.faculty,
+      duration: this.duration,
+      description: this.description,
+      requirements: this.requirements,
+      curriculum: this.curriculum,
+      intake: this.intake,
+      fees: this.fees,
+      status: this.status,
+      applicationDeadline: this.applicationDeadline,
+      createdAt: this.createdAt,
+      updatedAt: this.updatedAt
+    };
+  }
+
+  // Convert to Firestore format
+  toFirestore() {
     return {
       id: this.id,
       name: this.name,
@@ -225,8 +380,8 @@ class Course {
 
     // Validate requirements structure
     if (courseData.requirements) {
-      if (courseData.requirements.minGrade && !['A', 'B', 'C', 'D', 'E', 'F'].includes(courseData.requirements.minGrade)) {
-        errors.push('Minimum grade must be A, B, C, D, E, or F');
+      if (courseData.requirements.minGrade && !['A', 'B', 'C', 'D'].includes(courseData.requirements.minGrade)) {
+        errors.push('Minimum grade must be A, B, C, or D');
       }
 
       if (courseData.requirements.minPoints && (courseData.requirements.minPoints < 0 || courseData.requirements.minPoints > 100)) {

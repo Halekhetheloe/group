@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react'
 import { collection, query, getDocs, where, orderBy, doc, getDoc, addDoc } from 'firebase/firestore'
 import { db } from '../../firebase-config'
 import { useAuth } from '../../hooks/useAuth'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 
 const CourseBrowser = () => {
   const { userData } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [courses, setCourses] = useState([])
   const [filteredCourses, setFilteredCourses] = useState([])
   const [institutions, setInstitutions] = useState([])
@@ -529,24 +530,27 @@ const CourseBrowser = () => {
   return (
     <div className={styles.container}>
       <div className={styles.headerContainer}>
-        {/* Header */}
+        {/* Header - UPDATED: Only shows qualified courses */}
         <div className="mb-8">
-          <h1 className={styles.header}>Browse Courses</h1>
+          <h1 className={styles.header}>Courses You Qualify For</h1>
           <p className={styles.subtitle}>
             {studentGrades 
-              ? "Courses you qualify for based on your grades"
-              : "Discover programs from institutions across Lesotho"
+              ? `Showing courses that match your qualifications based on your grades`
+              : "We're checking your eligibility based on your academic records"
             }
             {!eligibilityChecked && " (Checking your eligibility...)"}
           </p>
+          
+          {/* Student Grades Info */}
           {studentGrades && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-              <p className="text-sm text-blue-800">
-                <strong>Your Grades:</strong> Overall: {studentGrades.overall || 'Not specified'} | 
-                Points: {studentGrades.points || 'Not specified'}
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+              <p className="text-sm text-green-800">
+                <strong>Your Academic Profile:</strong> Overall Grade: {studentGrades.overall || 'Not specified'} | 
+                Points: {studentGrades.points || 'Not specified'} | 
+                Subjects: {studentGrades.subjects ? Object.keys(studentGrades.subjects).join(', ') : 'Not specified'}
               </p>
-              <p className="text-xs text-blue-600 mt-1">
-               {courses.length} total courses, {filteredCourses.length} filtered
+              <p className="text-xs text-green-600 mt-1">
+                Showing {filteredCourses.length} courses that match your qualifications
               </p>
             </div>
           )}
@@ -579,7 +583,7 @@ const CourseBrowser = () => {
                   </div>
                   <input
                     type="text"
-                    placeholder="Search courses, institutions, or programs..."
+                    placeholder="Search qualified courses, institutions, or programs..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className={`${styles.inputField} pl-10`}
@@ -643,6 +647,12 @@ const CourseBrowser = () => {
               <strong>Note:</strong> We couldn't find your grade information. 
               Please update your student profile with your academic records to see courses you qualify for.
             </p>
+            <button
+              onClick={() => navigate('/student/profile')}
+              className="mt-2 bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
+            >
+              Update Profile
+            </button>
           </div>
         )}
 
@@ -655,15 +665,11 @@ const CourseBrowser = () => {
               
               return (
                 <div key={course.id} className={`${styles.card} group`}>
-                  {/* Eligibility Badge */}
+                  {/* Eligibility Badge - Always show since we're only showing qualified courses */}
                   {course.eligibility && (
                     <div className="mb-3">
-                      <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
-                        course.eligibility.eligible 
-                          ? 'bg-green-100 text-green-800 border border-green-200' 
-                          : 'bg-red-100 text-red-800 border border-red-200'
-                      }`}>
-                        {course.eligibility.eligible ? 'You Qualify' : 'Requirements Not Met'}
+                      <span className="inline-block px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
+                        ✅ You Qualify
                       </span>
                     </div>
                   )}
@@ -704,17 +710,17 @@ const CourseBrowser = () => {
 
                   {/* Requirements */}
                   {course.requirements && (
-                    <div className="mb-4 p-3 bg-slate-50 rounded-lg">
-                      <h4 className="text-sm font-medium text-slate-800 mb-2">Requirements:</h4>
+                    <div className="mb-4 p-3 bg-green-50 rounded-lg border border-green-200">
+                      <h4 className="text-sm font-medium text-green-800 mb-2">You Meet These Requirements:</h4>
                       <div className="space-y-1">
                         {course.requirements.minGrade && (
-                          <p className="text-xs text-slate-600">Minimum Grade: {course.requirements.minGrade}</p>
+                          <p className="text-xs text-green-700">✓ Minimum Grade: {course.requirements.minGrade}</p>
                         )}
                         {course.requirements.minPoints && (
-                          <p className="text-xs text-slate-600">Minimum Points: {course.requirements.minPoints}</p>
+                          <p className="text-xs text-green-700">✓ Minimum Points: {course.requirements.minPoints}</p>
                         )}
                         {course.requirements.subjects && course.requirements.subjects.length > 0 && (
-                          <p className="text-xs text-slate-600">Required Subjects: {course.requirements.subjects.join(', ')}</p>
+                          <p className="text-xs text-green-700">✓ Required Subjects: {course.requirements.subjects.join(', ')}</p>
                         )}
                       </div>
                     </div>
@@ -739,29 +745,17 @@ const CourseBrowser = () => {
                   <div className="flex space-x-2">
                     <button
                       onClick={() => applyForCourse(course.id)}
-                      disabled={hasApplied || deadlinePassed || !userData || (course.eligibility && !course.eligibility.eligible)}
+                      disabled={hasApplied || deadlinePassed || !userData}
                       className={styles.btnPrimary}
                     >
-                      {hasApplied ? 'Applied' : deadlinePassed ? 'Closed' : (course.eligibility && !course.eligibility.eligible) ? 'Not Eligible' : 'Apply Now'}
+                      {hasApplied ? 'Applied' : deadlinePassed ? 'Closed' : 'Apply Now'}
                     </button>
                   </div>
 
                   {/* Application Limit Warning */}
-                  {!hasApplied && !deadlinePassed && userData && course.eligibility?.eligible && (
+                  {!hasApplied && !deadlinePassed && userData && (
                     <div className="mt-2 text-xs text-slate-500">
                       Max 2 applications per institution
-                    </div>
-                  )}
-
-                  {/* Eligibility Details */}
-                  {course.eligibility && !course.eligibility.eligible && (
-                    <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
-                      <p className="font-medium">Why you don't qualify:</p>
-                      <ul className="list-disc list-inside mt-1">
-                        {course.eligibility.missingRequirements.map((req, index) => (
-                          <li key={index}>{req}</li>
-                        ))}
-                      </ul>
                     </div>
                   )}
                 </div>
@@ -773,24 +767,31 @@ const CourseBrowser = () => {
         {/* Empty State */}
         {filteredCourses.length === 0 && courses.length > 0 && (
           <div className={styles.emptyState}>
-            <div className="text-6xl mb-4">📚</div>
+            <div className="text-6xl mb-4">🎓</div>
             <h3 className={styles.emptyTitle}>
-              {studentGrades ? 'No courses match your qualifications' : 'No courses found'}
+              No courses match your current qualifications
             </h3>
             <p className={styles.emptyText}>
               {studentGrades 
-                ? 'Try updating your profile with better grades or explore different filters.'
-                : 'Try adjusting your search terms or filters.'
+                ? 'Try updating your profile with better grades or explore different career paths.'
+                : 'Complete your student profile with your academic records to see qualified courses.'
               }
             </p>
             {studentGrades && (
-              <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-                <p className="text-sm text-blue-800">
-                  <strong>Debug Info:</strong> You have {studentGrades.points || 0} points. 
+              <div className="mt-4 p-4 bg-blue-50 rounded-lg max-w-md mx-auto">
+                <p className="text-sm text-blue-800 text-center">
+                  <strong>Your Current Profile:</strong><br />
+                  Points: {studentGrades.points || 0} | Grade: {studentGrades.overall || 'Not specified'}<br />
                   There are {courses.length} total courses but none match your current qualifications.
                 </p>
               </div>
             )}
+            <button
+              onClick={() => navigate('/student/profile')}
+              className="mt-4 bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold"
+            >
+              Update My Profile
+            </button>
           </div>
         )}
 
@@ -798,8 +799,7 @@ const CourseBrowser = () => {
         {filteredCourses.length > 0 && (
           <div className="mt-6 text-center">
             <p className="text-sm text-slate-600">
-              Showing {filteredCourses.length} of {courses.length} courses
-              {studentGrades && ' that you qualify for'}
+              Showing {filteredCourses.length} courses that match your qualifications
             </p>
           </div>
         )}

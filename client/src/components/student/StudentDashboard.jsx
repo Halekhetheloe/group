@@ -4,7 +4,6 @@ import { db } from '../../firebase-config'
 import { useAuth } from '../../hooks/useAuth'
 import { useNavigate } from 'react-router-dom'
 import qualificationUtils from '../../utils/qualificationUtils'
-import { CheckCircle, XCircle, AlertCircle, Star, GraduationCap, Briefcase, Clock, BookOpen } from 'lucide-react'
 
 const StudentDashboard = () => {
   const { userData } = useAuth()
@@ -13,13 +12,11 @@ const StudentDashboard = () => {
     totalApplications: 0,
     pendingApplications: 0,
     admittedApplications: 0,
-    savedJobs: 0,
     eligibleCourses: 0,
     qualifiedJobs: 0
   })
   const [recentApplications, setRecentApplications] = useState([])
   const [recommendedJobs, setRecommendedJobs] = useState([])
-  const [upcomingDeadlines, setUpcomingDeadlines] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [studentProfile, setStudentProfile] = useState(null)
@@ -32,7 +29,6 @@ const StudentDashboard = () => {
     }
   }, [userData])
 
-  // Function to ensure student profile exists
   const ensureStudentProfile = async () => {
     try {
       if (!userData) return;
@@ -41,7 +37,6 @@ const StudentDashboard = () => {
       const studentDoc = await getDoc(studentDocRef);
       
       if (!studentDoc.exists()) {
-        // Create a basic student profile
         const basicProfile = {
           displayName: userData.displayName || '',
           email: userData.email || '',
@@ -55,12 +50,16 @@ const StudentDashboard = () => {
             certificates: [],
             skills: [],
             experience: '',
-            documents: {}
+            documents: {},
+            grades: {
+              overall: '',
+              subjects: {},
+              points: 0
+            }
           }
         };
 
         await setDoc(studentDocRef, basicProfile);
-        console.log('Created basic student profile');
         return basicProfile;
       }
       return studentDoc.data();
@@ -75,14 +74,12 @@ const StudentDashboard = () => {
       setLoading(true)
       setError(null)
       
-      // Ensure student profile exists first
       const profile = await ensureStudentProfile()
       if (profile) {
         setStudentProfile(profile)
         calculateProfileCompletion(profile)
       }
       
-      // Fetch student profile and grades
       await fetchStudentProfile()
       
       // Fetch student's applications
@@ -102,7 +99,7 @@ const StudentDashboard = () => {
       const applicationsWithDetails = await Promise.all(
         applications.map(async (app) => {
           try {
-            if (!app.courseId || typeof app.courseId !== 'string' || app.courseId.trim() === '') {
+            if (!app.courseId) {
               return {
                 ...app,
                 course: { name: 'Course information unavailable' }
@@ -137,35 +134,22 @@ const StudentDashboard = () => {
       const pendingApplications = applications.filter(app => app.status === 'pending').length
       const admittedApplications = applications.filter(app => app.status === 'admitted').length
 
-      // Get eligible courses count
+      // Get eligible courses count (FILTERED)
       const eligibleCoursesCount = await getEligibleCoursesCount()
 
-      // Fetch qualified jobs
+      // Fetch qualified jobs (FILTERED)
       const qualifiedJobs = await getQualifiedJobs()
 
       setStats({
         totalApplications: applications.length,
         pendingApplications,
         admittedApplications,
-        savedJobs: 0,
         eligibleCourses: eligibleCoursesCount,
         qualifiedJobs: qualifiedJobs.length
       })
 
-      // Set recent applications
       setRecentApplications(applicationsWithDetails)
-
-      // Set recommended jobs (already qualified)
       setRecommendedJobs(qualifiedJobs)
-
-      // Fetch upcoming deadlines for eligible courses only
-      try {
-        const upcomingCourses = await getUpcomingEligibleDeadlines()
-        setUpcomingDeadlines(upcomingCourses)
-      } catch (coursesError) {
-        console.error('Error fetching courses:', coursesError)
-        setUpcomingDeadlines([])
-      }
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error)
@@ -215,6 +199,12 @@ const StudentDashboard = () => {
     if (qual.experience) completed++
     total += 1
 
+    // Course qualifications
+    const grades = qual.grades || {}
+    if (Object.keys(grades.subjects || {}).length > 0) completed++
+    if (grades.overall) completed++
+    total += 2
+
     setProfileCompletion(Math.round((completed / total) * 100))
   }
 
@@ -222,20 +212,27 @@ const StudentDashboard = () => {
     try {
       if (!userData) return 0
 
+      // Get student profile
+      const studentDoc = await getDoc(doc(db, 'students', userData.uid))
+      if (!studentDoc.exists()) return 0
+
+      const studentProfile = studentDoc.data()
+
       // Get all active courses
       const coursesQuery = query(
         collection(db, 'courses'),
         where('status', '==', 'active')
       )
       const coursesSnapshot = await getDocs(coursesQuery)
-      const courses = coursesSnapshot.docs.map(doc => ({
+      const allCourses = coursesSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }))
 
-      // For now, return all active courses count
-      // You can add course-specific qualification logic later
-      return courses.length
+      // Use qualificationUtils to filter qualified courses
+      const eligibleCourses = qualificationUtils.filterQualifiedCourses(allCourses, studentProfile)
+
+      return eligibleCourses.length
     } catch (error) {
       console.error('Error counting eligible courses:', error)
       return 0
@@ -244,10 +241,13 @@ const StudentDashboard = () => {
 
   const getQualifiedJobs = async () => {
     try {
-      if (!userData) {
-        console.log('No user data available')
-        return []
-      }
+      if (!userData) return []
+
+      // Get student profile
+      const studentDoc = await getDoc(doc(db, 'students', userData.uid))
+      if (!studentDoc.exists()) return []
+
+      const studentProfile = studentDoc.data()
 
       // Get all active jobs
       const jobsQuery = query(
@@ -261,45 +261,15 @@ const StudentDashboard = () => {
         ...doc.data()
       }))
 
-      console.log('Total jobs found:', allJobs.length)
-      console.log('Student profile:', studentProfile)
-
       // Filter jobs based on student qualifications
       const qualifiedJobs = qualificationUtils.filterQualifiedJobs(allJobs, studentProfile)
       
-      console.log('Qualified jobs after filtering:', qualifiedJobs.length)
-
       // Sort by match score and get qualification details
       const jobsWithScores = qualificationUtils.sortJobsByMatchScore(qualifiedJobs, studentProfile)
 
-      return jobsWithScores.slice(0, 5) // Return top 5 qualified jobs
+      return jobsWithScores.slice(0, 5)
     } catch (error) {
       console.error('Error fetching qualified jobs:', error)
-      return []
-    }
-  }
-
-  const getUpcomingEligibleDeadlines = async () => {
-    try {
-      if (!userData) return []
-
-      // Get all active courses with upcoming deadlines
-      const coursesQuery = query(
-        collection(db, 'courses'),
-        where('status', '==', 'active'),
-        orderBy('applicationDeadline', 'asc'),
-        limit(10)
-      )
-      const coursesSnapshot = await getDocs(coursesQuery)
-      const courses = coursesSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }))
-
-      // Return top 3
-      return courses.slice(0, 3)
-    } catch (error) {
-      console.error('Error fetching upcoming deadlines:', error)
       return []
     }
   }
@@ -311,7 +281,6 @@ const StudentDashboard = () => {
     }
     
     try {
-      // Submit application directly without form
       const applicationData = {
         studentId: userData.uid,
         jobId: jobId,
@@ -321,13 +290,8 @@ const StudentDashboard = () => {
         studentEmail: userData.email || '',
       }
 
-      // Add application to Firestore
       await addDoc(collection(db, 'jobApplications'), applicationData)
-      
-      // Show success message
       alert('Application submitted successfully!')
-      
-      // Refresh the dashboard to update stats
       fetchDashboardData()
       
     } catch (error) {
@@ -336,11 +300,34 @@ const StudentDashboard = () => {
     }
   }
 
-  const handleViewCourse = (courseId) => {
+  const handleApplyToCourse = async (courseId) => {
     if (!courseId) {
       console.error('Course ID is undefined')
       return
     }
+    
+    try {
+      const applicationData = {
+        studentId: userData.uid,
+        courseId: courseId,
+        appliedAt: new Date(),
+        status: 'pending',
+        studentName: userData.displayName || '',
+        studentEmail: userData.email || '',
+      }
+
+      await addDoc(collection(db, 'applications'), applicationData)
+      alert('Course application submitted successfully!')
+      fetchDashboardData()
+      
+    } catch (error) {
+      console.error('Error submitting course application:', error)
+      alert('Failed to submit application. Please try again.')
+    }
+  }
+
+  const handleViewCourse = (courseId) => {
+    if (!courseId) return
     navigate(`/student/courses`)
   }
 
@@ -360,19 +347,39 @@ const StudentDashboard = () => {
     }
   }
 
-  const StatCard = ({ title, value, subtitle, onClick, icon: Icon }) => (
+  // Navigation handlers
+  const handleViewAllApplications = () => {
+    navigate('/student/applications')
+  }
+
+  const handleMyApplications = () => {
+    navigate('/student/applications')
+  }
+
+  const handleMyProfile = () => {
+    navigate('/student/profile')
+  }
+
+  const handleBrowseCourses = () => {
+    navigate('/student/courses')
+  }
+
+  const handleBrowseJobs = () => {
+    navigate('/student/jobs')
+  }
+
+  const StatCard = ({ title, value, subtitle, onClick }) => (
     <div 
-      className={`stat-card ${onClick ? 'cursor-pointer hover:scale-105' : ''}`}
+      className={`bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:shadow-md transition-all duration-200 ${
+        onClick ? 'cursor-pointer hover:scale-105' : ''
+      }`}
       onClick={onClick}
     >
-      <div className="stat-card-content">
+      <div className="flex items-center justify-between">
         <div>
-          <p className="stat-card-title">{title}</p>
-          <p className="stat-card-value">{value}</p>
-          {subtitle && <p className="stat-card-subtitle">{subtitle}</p>}
-        </div>
-        <div className="stat-card-icon">
-          {Icon && <Icon className="h-6 w-6 text-current" />}
+          <p className="text-sm font-medium text-gray-600">{title}</p>
+          <p className="text-2xl font-bold text-gray-900 mt-1">{value}</p>
+          {subtitle && <p className="text-sm text-gray-500 mt-1">{subtitle}</p>}
         </div>
       </div>
     </div>
@@ -380,18 +387,18 @@ const StudentDashboard = () => {
 
   const getStatusBadge = (status) => {
     const statusConfig = {
-      pending: { color: 'status-badge-pending', label: 'Pending' },
-      admitted: { color: 'status-badge-admitted', label: 'Admitted' },
-      rejected: { color: 'status-badge-rejected', label: 'Rejected' },
-      submitted: { color: 'status-badge-pending', label: 'Submitted' },
-      under_review: { color: 'status-badge-pending', label: 'Under Review' },
-      accepted: { color: 'status-badge-admitted', label: 'Accepted' },
-      declined: { color: 'status-badge-rejected', label: 'Declined' }
+      pending: { color: 'bg-yellow-100 text-yellow-800', label: 'Pending' },
+      admitted: { color: 'bg-green-100 text-green-800', label: 'Admitted' },
+      rejected: { color: 'bg-red-100 text-red-800', label: 'Rejected' },
+      submitted: { color: 'bg-yellow-100 text-yellow-800', label: 'Submitted' },
+      under_review: { color: 'bg-yellow-100 text-yellow-800', label: 'Under Review' },
+      accepted: { color: 'bg-green-100 text-green-800', label: 'Accepted' },
+      declined: { color: 'bg-red-100 text-red-800', label: 'Declined' }
     }
-    const config = statusConfig[status] || { color: 'status-badge-default', label: status }
+    const config = statusConfig[status] || { color: 'bg-gray-100 text-gray-800', label: status }
     
     return (
-      <span className={`status-badge ${config.color}`}>
+      <span className={`px-2 py-1 text-xs font-medium rounded-full ${config.color}`}>
         {config.label}
       </span>
     )
@@ -412,51 +419,21 @@ const StudentDashboard = () => {
     }
   }
 
-  const isDeadlineApproaching = (deadline) => {
-    if (!deadline) return false
-    try {
-      const deadlineDate = deadline.toDate ? deadline.toDate() : new Date(deadline)
-      const daysUntilDeadline = Math.ceil((deadlineDate - new Date()) / (1000 * 60 * 60 * 24))
-      return daysUntilDeadline <= 7 && daysUntilDeadline >= 0
-    } catch (error) {
-      console.error('Error checking deadline:', error)
-      return false
-    }
-  }
-
-  // Navigation handlers
-  const handleViewAllApplications = () => {
-    navigate('/student/applications')
-  }
-
-  const handleMyApplications = () => {
-    navigate('/student/applications')
-  }
-
-  const handleMyProfile = () => {
-    navigate('/student/profile')
-  }
-
-  const handleAddGrades = () => {
-    navigate('/student/profile')
-  }
-
   if (loading) {
     return (
-      <div className="student-dashboard">
-        <div className="dashboard-container">
+      <div className="min-h-screen bg-gray-50 p-6">
+        <div className="max-w-7xl mx-auto">
           <div className="animate-pulse">
-            <div className="loading-header"></div>
-            <div className="stats-grid">
+            <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
               {[...Array(4)].map((_, i) => (
-                <div key={i} className="loading-stat"></div>
+                <div key={i} className="h-24 bg-gray-200 rounded-xl"></div>
               ))}
             </div>
-            <div className="dashboard-grid">
-              <div className="loading-card"></div>
-              <div className="loading-card"></div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+              <div className="h-64 bg-gray-200 rounded-xl"></div>
+              <div className="h-64 bg-gray-200 rounded-xl"></div>
             </div>
-            <div className="loading-card-large"></div>
           </div>
         </div>
       </div>
@@ -465,22 +442,20 @@ const StudentDashboard = () => {
 
   if (error) {
     return (
-      <div className="student-dashboard">
-        <div className="dashboard-container">
-          <div className="error-container">
-            <div className="error-content">
-              <h3 className="error-title">Dashboard Loading Issue</h3>
-              <p className="error-message">{error}</p>
-              <p className="error-help">
-                This is usually temporary while Firestore indexes are building. Please wait a few minutes and refresh.
-              </p>
-              <button 
-                onClick={fetchDashboardData}
-                className="retry-button"
-              >
-                Try Again
-              </button>
-            </div>
+      <div className="min-h-screen bg-gray-50 p-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="bg-white rounded-xl p-8 text-center">
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">Dashboard Loading Issue</h3>
+            <p className="text-gray-600 mb-4">{error}</p>
+            <p className="text-sm text-gray-500 mb-6">
+              This is usually temporary while Firestore indexes are building. Please wait a few minutes and refresh.
+            </p>
+            <button 
+              onClick={fetchDashboardData}
+              className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg font-medium transition-colors"
+            >
+              Try Again
+            </button>
           </div>
         </div>
       </div>
@@ -488,12 +463,12 @@ const StudentDashboard = () => {
   }
 
   return (
-    <div className="student-dashboard">
-      <div className="dashboard-container">
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="dashboard-header">
-          <h1 className="dashboard-title">Student Dashboard</h1>
-          <p className="dashboard-subtitle">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Student Dashboard</h1>
+          <p className="text-gray-600 mt-2">
             Welcome back, {userData?.displayName || 'Student'}! Here are your personalized recommendations.
             {studentProfile?.profileCompleted ? (
               <span className="text-green-600 font-medium"> Showing jobs that match your qualifications</span>
@@ -504,77 +479,79 @@ const StudentDashboard = () => {
         </div>
 
         {/* Stats Grid */}
-        <div className="stats-grid">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <StatCard
             title="Total Applications"
             value={stats.totalApplications}
             subtitle={`${stats.pendingApplications} pending`}
             onClick={handleMyApplications}
-            icon={Briefcase}
           />
           <StatCard
             title="Admissions"
             value={stats.admittedApplications}
             subtitle="Accepted offers"
-            icon={CheckCircle}
           />
           <StatCard
             title="Eligible Courses"
             value={stats.eligibleCourses}
-            subtitle="Available courses"
-            icon={GraduationCap}
+            subtitle="Matching your grades"
+            onClick={handleBrowseCourses}
           />
           <StatCard
             title="Qualified Jobs"
             value={stats.qualifiedJobs}
-            subtitle="Matching your profile"
-            icon={Star}
+            subtitle="Matching your education"
+            onClick={handleBrowseJobs}
           />
         </div>
 
-        <div className="dashboard-grid">
+        {/* Recent Applications Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           {/* Recent Applications */}
-          <div className="dashboard-card">
-            <div className="card-header">
-              <h3 className="card-title">Recent Applications</h3>
-              <button 
-                className="view-all-button"
-                onClick={handleViewAllApplications}
-              >
-                View All
-              </button>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900">Recent Applications</h3>
+                <button 
+                  className="text-blue-600 hover:text-blue-800 font-medium text-sm"
+                  onClick={handleViewAllApplications}
+                >
+                  View All
+                </button>
+              </div>
             </div>
-            <div className="card-content">
+            <div className="p-6">
               {recentApplications.length > 0 ? (
-                recentApplications.map(application => (
-                  <div 
-                    key={application.id} 
-                    className="application-item cursor-pointer hover:bg-gray-50 transition-colors"
-                    onClick={() => handleViewCourse(application.courseId)}
-                  >
-                    <div className="application-content">
-                      <h4 className="application-title">
-                        {application.course?.name || 'Unknown Course'}
-                      </h4>
-                      <div className="application-meta">
-                        Applied {formatDate(application.appliedAt)}
-                        {application.course?.institutionName && (
-                          <span className="application-institution">
-                            • {application.course.institutionName}
-                          </span>
-                        )}
+                <div className="space-y-4">
+                  {recentApplications.map(application => (
+                    <div 
+                      key={application.id} 
+                      className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+                      onClick={() => handleViewCourse(application.courseId)}
+                    >
+                      <div>
+                        <h4 className="font-medium text-gray-900">
+                          {application.course?.name || 'Unknown Course'}
+                        </h4>
+                        <div className="text-sm text-gray-500 mt-1">
+                          Applied {formatDate(application.appliedAt)}
+                          {application.course?.institutionName && (
+                            <span className="ml-2">
+                              • {application.course.institutionName}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex-shrink-0">
+                        {getStatusBadge(application.status)}
                       </div>
                     </div>
-                    <div className="application-status">
-                      {getStatusBadge(application.status)}
-                    </div>
-                  </div>
-                ))
+                  ))}
+                </div>
               ) : (
-                <div className="empty-state">
-                  <div className="empty-icon"></div>
-                  <p className="empty-text">No applications yet</p>
-                  <p className="empty-subtext">
+                <div className="text-center py-8">
+                  <p className="text-gray-500">No applications yet</p>
+                  <p className="text-sm text-gray-400 mt-1">
                     Your course applications will appear here
                   </p>
                 </div>
@@ -582,167 +559,123 @@ const StudentDashboard = () => {
             </div>
           </div>
 
-          {/* Upcoming Deadlines */}
-          <div className="dashboard-card">
-            <div className="card-header">
-              <h3 className="card-title">Course Deadlines</h3>
+          {/* Quick Actions */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+            <div className="p-6 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Quick Actions</h3>
             </div>
-            <div className="card-content">
-              {upcomingDeadlines.length > 0 ? (
-                upcomingDeadlines.map(course => {
-                  const deadlineDate = course.applicationDeadline?.toDate ? course.applicationDeadline.toDate() : new Date(course.applicationDeadline)
-                  const daysUntilDeadline = Math.ceil((deadlineDate - new Date()) / (1000 * 60 * 60 * 24))
-                  
-                  return (
-                    <div 
-                      key={course.id} 
-                      className={`deadline-item cursor-pointer hover:bg-gray-50 transition-colors ${
-                        isDeadlineApproaching(course.applicationDeadline) 
-                          ? 'deadline-urgent' 
-                          : 'deadline-normal'
-                      }`}
-                      onClick={() => handleViewCourse(course.id)}
-                    >
-                      <div className="deadline-content">
-                        <div className="deadline-header">
-                          <h4 className="deadline-title">{course.name}</h4>
-                          <p className="deadline-institution">{course.institutionName}</p>
-                        </div>
-                        <span className="eligibility-badge bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
-                          Available
-                        </span>
-                        {isDeadlineApproaching(course.applicationDeadline) && (
-                          <span className="urgent-badge">
-                            Soon
-                          </span>
-                        )}
-                      </div>
-                      <div className="deadline-meta">
-                        <span className="deadline-date">
-                          Deadline: {formatDate(course.applicationDeadline)}
-                        </span>
-                        {isDeadlineApproaching(course.applicationDeadline) && (
-                          <span className="days-remaining">
-                            {daysUntilDeadline} days left
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })
-              ) : (
-                <div className="empty-state">
-                  <div className="empty-icon"></div>
-                  <p className="empty-text">No upcoming deadlines</p>
-                  <p className="empty-subtext">
-                    Check back later for new course opportunities
-                  </p>
-                </div>
-              )}
+            <div className="p-6">
+              <div className="grid grid-cols-1 gap-4">
+                <button 
+                  className="p-6 border border-gray-200 rounded-lg text-left hover:bg-gray-50 transition-colors"
+                  onClick={handleMyApplications}
+                >
+                  <span className="block font-medium text-gray-900 mb-2">My Applications</span>
+                  <span className="text-sm text-gray-500">View status & history</span>
+                </button>
+                <button 
+                  className="p-6 border border-gray-200 rounded-lg text-left hover:bg-gray-50 transition-colors"
+                  onClick={handleMyProfile}
+                >
+                  <span className="block font-medium text-gray-900 mb-2">My Profile</span>
+                  <span className="text-sm text-gray-500">Update qualifications</span>
+                </button>
+                <button 
+                  className="p-6 border border-gray-200 rounded-lg text-left hover:bg-gray-50 transition-colors"
+                  onClick={handleBrowseCourses}
+                >
+                  <span className="block font-medium text-gray-900 mb-2">Browse Courses</span>
+                  <span className="text-sm text-gray-500">Find courses you qualify for</span>
+                </button>
+                
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Qualified Jobs - Direct Application */}
-        <div className="dashboard-card">
-          <div className="card-header">
-            <h3 className="card-title">Jobs Matching Your Qualifications</h3>
-            <p className="text-sm text-gray-600">
+        {/* Qualified Jobs Section */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-8">
+          <div className="p-6 border-b border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900">Jobs Matching Your Qualifications</h3>
+            <p className="text-sm text-gray-600 mt-1">
               {recommendedJobs.length > 0 
                 ? `${recommendedJobs.length} jobs match your profile` 
                 : 'No qualified jobs found'}
             </p>
           </div>
-          <div className="card-content">
+          <div className="p-6">
             {recommendedJobs.length > 0 ? (
               <div className="space-y-4">
                 {recommendedJobs.map(job => {
-                  const deadlineDate = job.deadline?.toDate ? job.deadline.toDate() : new Date(job.deadline)
-                  const daysUntilDeadline = Math.ceil((deadlineDate - new Date()) / (1000 * 60 * 60 * 24))
-                  const matchBadge = getMatchBadge(job.matchScore)
                   const qualificationBreakdown = qualificationUtils.getQualificationBreakdown(job, studentProfile)
                   
                   return (
                     <div 
                       key={job.id} 
-                      className="job-item cursor-pointer hover:bg-green-50 transition-colors border-2 border-green-200"
+                      className="p-6 border-2 border-green-200 rounded-lg hover:bg-green-50 transition-colors cursor-pointer"
                       onClick={() => handleApplyNow(job.id)}
                     >
-                      <div className="job-content">
-                        <div className="job-header">
-                          <h4 className="job-title">{job.title}</h4>
-                          <p className="job-company">{job.companyName}</p>
+                      <div className="flex items-start justify-between mb-4">
+                        <div>
+                          <h4 className="text-lg font-semibold text-gray-900">{job.title}</h4>
+                          <p className="text-gray-600">{job.companyName}</p>
                         </div>
-                        <div className="flex items-center gap-2 mt-2 flex-wrap">
-                          <span className={`eligibility-badge ${matchBadge.color} text-xs px-2 py-1 rounded-full flex items-center`}>
-                            <Star className="h-3 w-3 mr-1" />
-                            {matchBadge.label} ({job.matchScore}%)
+                        <div className="flex items-center space-x-2">
+                          <span className="bg-green-100 text-green-800 text-xs px-3 py-1 rounded-full font-medium">
+                            Qualified ({job.matchScore}%)
                           </span>
-                          {isDeadlineApproaching(job.deadline) && (
-                            <span className="urgent-badge">
-                              <Clock className="h-3 w-3 mr-1" />
-                              Apply Soon
-                            </span>
-                          )}
                         </div>
                       </div>
-                      <div className="job-meta">
-                        <div className="job-details">
-                          <span className="job-type capitalize">{job.jobType}</span>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 text-sm text-gray-600">
+                        <div>
+                          <span className="font-medium capitalize">{job.type}</span>
+                        </div>
+                        <div>
                           {job.location && (
-                            <span className="job-location">• {job.location}</span>
+                            <span>Location: {job.location}</span>
                           )}
                         </div>
-                        <div className="job-deadline">
+                        <div>
                           {job.deadline ? (
                             <span>Apply by: {formatDate(job.deadline)}</span>
                           ) : (
                             <span>Open until filled</span>
                           )}
-                          {isDeadlineApproaching(job.deadline) && job.deadline && (
-                            <span className="days-remaining">
-                              {daysUntilDeadline} days left
-                            </span>
-                          )}
                         </div>
-                        {job.salary && (
-                          <div className="job-salary">
-                            <span className="font-medium">{job.salary}</span>
-                          </div>
-                        )}
-                        {/* Qualification Preview */}
-                        <div className="mt-3 p-3 bg-blue-50 rounded-lg">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-medium text-blue-800">Qualification Match</span>
-                            <button 
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleViewQualificationDetails(job)
-                              }}
-                              className="text-xs text-blue-600 hover:text-blue-800 font-medium"
-                            >
-                              View Details
-                            </button>
-                          </div>
-                          <div className="space-y-1">
-                            {qualificationBreakdown.slice(0, 3).map((item, index) => (
-                              <div key={index} className="flex items-center text-xs">
-                                {item.meets ? (
-                                  <CheckCircle className="h-3 w-3 text-green-500 mr-1" />
-                                ) : (
-                                  <XCircle className="h-3 w-3 text-red-500 mr-1" />
-                                )}
-                                <span className={item.meets ? 'text-green-700' : 'text-red-700'}>
-                                  {item.requirement.split(':')[0]}
-                                </span>
-                              </div>
-                            ))}
-                            {qualificationBreakdown.length > 3 && (
-                              <div className="text-xs text-blue-600">
-                                +{qualificationBreakdown.length - 3} more requirements
-                              </div>
-                            )}
-                          </div>
+                      </div>
+
+                      {job.salary && (
+                        <div className="mb-4">
+                          <span className="font-medium text-gray-900">{job.salary}</span>
+                        </div>
+                      )}
+
+                      {/* Qualification Preview */}
+                      <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-sm font-medium text-blue-800">Qualification Match</span>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleViewQualificationDetails(job)
+                            }}
+                            className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                          >
+                            View Details
+                          </button>
+                        </div>
+                        <div className="space-y-2">
+                          {qualificationBreakdown.slice(0, 2).map((item, index) => (
+                            <div key={index} className="flex items-center text-sm">
+                              <span className={`w-2 h-2 rounded-full mr-3 ${
+                                item.meets ? 'bg-green-500' : 'bg-red-500'
+                              }`}></span>
+                              <span className={item.meets ? 'text-green-700' : 'text-red-700'}>
+                                {item.requirement.split(':')[0]}
+                              </span>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     </div>
@@ -750,23 +683,22 @@ const StudentDashboard = () => {
                 })}
               </div>
             ) : (
-              <div className="empty-state">
-                <div className="empty-icon"></div>
-                <p className="empty-text">
+              <div className="text-center py-8">
+                <p className="text-gray-500">
                   {studentProfile?.profileCompleted 
                     ? 'No jobs matching your qualifications yet' 
                     : 'Complete your profile to see qualified jobs'
                   }
                 </p>
-                <p className="empty-subtext">
+                <p className="text-sm text-gray-400 mt-1">
                   {studentProfile?.profileCompleted
                     ? 'Check back later for new opportunities that match your qualifications'
-                    : 'Update your profile with your education, skills, and experience'
+                    : 'Update your profile with your education and GPA'
                   }
                 </p>
                 {!studentProfile?.profileCompleted && (
                   <button 
-                    className="empty-action-button"
+                    className="mt-4 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium transition-colors"
                     onClick={handleMyProfile}
                   >
                     Complete Profile
@@ -777,62 +709,23 @@ const StudentDashboard = () => {
           </div>
         </div>
 
-        {/* Quick Actions */}
-        <div className="dashboard-card">
-          <h3 className="card-title">Quick Actions</h3>
-          <div className="quick-actions-grid">
-            <button 
-              className="quick-action-card"
-              onClick={handleMyApplications}
-            >
-              <div className="action-icon">
-                <Briefcase className="h-6 w-6" />
-              </div>
-              <span className="action-title">My Applications</span>
-              <span className="action-subtitle">View status & history</span>
-            </button>
-            <button 
-              className="quick-action-card"
-              onClick={handleMyProfile}
-            >
-              <div className="action-icon">
-                <BookOpen className="h-6 w-6" />
-              </div>
-              <span className="action-title">My Profile</span>
-              <span className="action-subtitle">Update qualifications</span>
-            </button>
-            {profileCompletion < 70 && (
-              <button 
-                className="quick-action-card bg-yellow-50 border-yellow-200"
-                onClick={handleMyProfile}
-              >
-                <div className="action-icon">
-                  <AlertCircle className="h-6 w-6 text-yellow-600" />
-                </div>
-                <span className="action-title">Complete Profile</span>
-                <span className="action-subtitle">{profileCompletion}% complete</span>
-              </button>
-            )}
-          </div>
-        </div>
-
         {/* Profile Completion Panel */}
         {profileCompletion < 70 && (
-          <div className="dashboard-card bg-yellow-50 border border-yellow-200">
-            <div className="flex items-start space-x-3">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 mb-8">
+            <div className="flex items-start">
               <div className="flex-shrink-0">
                 <div className="w-6 h-6 bg-yellow-500 rounded-full flex items-center justify-center">
-                  <span className="text-white text-sm">!</span>
+                  <span className="text-white text-sm font-bold">!</span>
                 </div>
               </div>
-              <div className="flex-1">
+              <div className="ml-4">
                 <h4 className="text-yellow-800 font-medium">Complete Your Profile</h4>
                 <p className="text-yellow-700 text-sm mt-1">
-                  Your profile is {profileCompletion}% complete. Finish setting up your qualifications to see more job matches.
+                  Your profile is {profileCompletion}% complete. Finish setting up your qualifications to see more job and course matches.
                 </p>
                 <button 
                   onClick={handleMyProfile}
-                  className="mt-2 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                  className="mt-3 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
                 >
                   Complete Profile
                 </button>
@@ -841,20 +734,18 @@ const StudentDashboard = () => {
           </div>
         )}
 
-        {/* Qualification Details Modal */}
+        {/* Job Qualification Details Modal */}
         {showQualificationDetails && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
               <div className="p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl font-semibold text-gray-900">
-                    Qualification Details
-                  </h3>
+                  <h3 className="text-xl font-semibold text-gray-900">Qualification Details</h3>
                   <button 
                     onClick={() => setShowQualificationDetails(null)}
-                    className="text-gray-400 hover:text-gray-600"
+                    className="text-gray-400 hover:text-gray-600 text-lg font-bold"
                   >
-                    <XCircle className="h-6 w-6" />
+                    ×
                   </button>
                 </div>
 
@@ -886,11 +777,9 @@ const StudentDashboard = () => {
                     <div className="space-y-3">
                       {qualificationUtils.getQualificationBreakdown(showQualificationDetails, studentProfile).map((item, index) => (
                         <div key={index} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
-                          {item.meets ? (
-                            <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                          ) : (
-                            <XCircle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
-                          )}
+                          <div className={`w-3 h-3 rounded-full mt-1 flex-shrink-0 ${
+                            item.meets ? 'bg-green-500' : 'bg-red-500'
+                          }`}></div>
                           <div className="flex-1">
                             <p className={`font-medium ${item.meets ? 'text-green-700' : 'text-red-700'}`}>
                               {item.requirement}
@@ -908,7 +797,7 @@ const StudentDashboard = () => {
                 <div className="flex space-x-3 mt-6">
                   <button 
                     onClick={() => setShowQualificationDetails(null)}
-                    className="btn-secondary flex-1"
+                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                   >
                     Close
                   </button>
@@ -917,7 +806,7 @@ const StudentDashboard = () => {
                       handleApplyNow(showQualificationDetails.id)
                       setShowQualificationDetails(null)
                     }}
-                    className="btn-primary flex-1"
+                    className="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium transition-colors"
                   >
                     Apply Now
                   </button>

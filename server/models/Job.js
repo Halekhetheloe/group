@@ -13,7 +13,14 @@ class Job {
     this.experienceLevel = data.experienceLevel;
     this.description = data.description;
     this.responsibilities = data.responsibilities || [];
-    this.requirements = data.requirements || {};
+    
+    // SIMPLIFIED: Only educational level and GPA requirements
+    this.requirements = {
+      educationalLevel: data.requirements?.educationalLevel || '', // high_school, bachelor, master, phd
+      minGPA: data.requirements?.minGPA || 0, // 0-4.0 scale
+      ...data.requirements
+    };
+    
     this.benefits = data.benefits || [];
     this.salary = data.salary || {};
     this.applicationDeadline = data.applicationDeadline;
@@ -100,7 +107,6 @@ class Job {
       }
 
       if (search) {
-        // Basic search implementation
         query = query.where('title', '>=', search).where('title', '<=', search + '\uf8ff');
       }
 
@@ -149,50 +155,103 @@ class Job {
     }
   }
 
-  // Static method to find jobs by company
-  static async findByCompany(companyId, options = {}) {
+  // NEW: Static method to find jobs qualified for a student
+  static async findQualifiedForStudent(studentProfile, options = {}) {
     try {
-      const { status, page = 1, limit = 10 } = options;
+      const { page = 1, limit = 10 } = options;
 
+      // Get all active jobs
       let query = db.collection(collections.JOBS)
-        .where('companyId', '==', companyId);
+        .where('status', '==', 'active');
 
-      if (status) {
-        query = query.where('status', '==', status);
-      }
-
-      // Get total count
-      const countSnapshot = await query.get();
-      const total = countSnapshot.size;
-
-      // Apply pagination
-      const startAfter = (page - 1) * limit;
       const snapshot = await query
         .orderBy('createdAt', 'desc')
-        .offset(startAfter)
-        .limit(limit)
         .get();
 
-      const jobs = [];
+      const allJobs = [];
       snapshot.forEach(doc => {
-        jobs.push(new Job({
+        allJobs.push(new Job({
           id: doc.id,
           ...doc.data()
         }));
       });
 
+      // Filter jobs based on student qualifications
+      const qualifiedJobs = allJobs.filter(job => {
+        return job.checkStudentQualification(studentProfile);
+      });
+
+      // Apply pagination
+      const startIndex = (page - 1) * limit;
+      const paginatedJobs = qualifiedJobs.slice(startIndex, startIndex + limit);
+
       return {
-        jobs,
+        jobs: paginatedJobs,
         pagination: {
           page,
           limit,
-          total,
-          pages: Math.ceil(total / limit)
+          total: qualifiedJobs.length,
+          pages: Math.ceil(qualifiedJobs.length / limit)
         }
       };
     } catch (error) {
-      throw new Error(`Failed to find company jobs: ${error.message}`);
+      throw new Error(`Failed to find qualified jobs: ${error.message}`);
     }
+  }
+
+  // NEW: Check if student qualifies for this job
+  checkStudentQualification(studentProfile) {
+    const studentEducation = studentProfile?.qualifications || {};
+    const studentGPA = parseFloat(studentEducation.gpa) || 0;
+    const studentLevel = studentEducation.educationLevel || '';
+    
+    // Check educational level
+    const educationLevels = ['high_school', 'associate', 'bachelor', 'master', 'phd'];
+    const studentLevelIndex = educationLevels.indexOf(studentLevel);
+    const requiredLevelIndex = educationLevels.indexOf(this.requirements.educationalLevel);
+    
+    const meetsEducationLevel = studentLevelIndex >= requiredLevelIndex;
+    
+    // Check GPA
+    const meetsGPA = studentGPA >= this.requirements.minGPA;
+    
+    return meetsEducationLevel && meetsGPA;
+  }
+
+  // NEW: Get qualification breakdown for display
+  getQualificationBreakdown(studentProfile) {
+    const studentEducation = studentProfile?.qualifications || {};
+    const studentGPA = parseFloat(studentEducation.gpa) || 0;
+    const studentLevel = studentEducation.educationLevel || '';
+    
+    const educationLevels = {
+      'high_school': 'High School Diploma',
+      'associate': 'Associate Degree',
+      'bachelor': "Bachelor's Degree",
+      'master': "Master's Degree",
+      'phd': 'PhD'
+    };
+
+    const breakdown = [];
+
+    // Education level check
+    const studentLevelIndex = ['high_school', 'associate', 'bachelor', 'master', 'phd'].indexOf(studentLevel);
+    const requiredLevelIndex = ['high_school', 'associate', 'bachelor', 'master', 'phd'].indexOf(this.requirements.educationalLevel);
+    
+    breakdown.push({
+      requirement: `Education Level: ${educationLevels[this.requirements.educationalLevel] || this.requirements.educationalLevel}`,
+      studentValue: educationLevels[studentLevel] || studentLevel || 'Not specified',
+      meets: studentLevelIndex >= requiredLevelIndex
+    });
+
+    // GPA check
+    breakdown.push({
+      requirement: `Minimum GPA: ${this.requirements.minGPA}`,
+      studentValue: studentGPA > 0 ? studentGPA.toFixed(1) : 'Not specified',
+      meets: studentGPA >= this.requirements.minGPA
+    });
+
+    return breakdown;
   }
 
   // Update job
@@ -299,34 +358,6 @@ class Job {
     }
   }
 
-  // Get similar jobs
-  async getSimilarJobs(limit = 4) {
-    try {
-      const snapshot = await db.collection(collections.JOBS)
-        .where('companyId', '==', this.companyId)
-        .where('status', '==', 'active')
-        .where('id', '!=', this.id)
-        .limit(limit)
-        .get();
-
-      const similarJobs = [];
-      snapshot.forEach(doc => {
-        const jobData = doc.data();
-        similarJobs.push({
-          id: doc.id,
-          title: jobData.title,
-          type: jobData.type,
-          location: jobData.location,
-          experienceLevel: jobData.experienceLevel
-        });
-      });
-
-      return similarJobs;
-    } catch (error) {
-      throw new Error(`Failed to get similar jobs: ${error.message}`);
-    }
-  }
-
   // Check if job is active
   isActive() {
     return this.status === 'active';
@@ -343,75 +374,6 @@ class Job {
     }
 
     return true;
-  }
-
-  // Check job match with student profile
-  checkMatch(studentProfile) {
-    const match = {
-      score: 0,
-      matchedCriteria: [],
-      missingCriteria: []
-    };
-
-    const { education, skills, experience, transcripts } = studentProfile;
-
-    // Education match
-    if (this.requirements.education) {
-      if (education && education.includes(this.requirements.education)) {
-        match.score += 25;
-        match.matchedCriteria.push('education');
-      } else {
-        match.missingCriteria.push('education');
-      }
-    }
-
-    // Skills match
-    if (this.requirements.skills && this.requirements.skills.length > 0) {
-      const matchedSkills = this.requirements.skills.filter(skill => 
-        skills && skills.includes(skill)
-      );
-      
-      const skillMatchPercentage = (matchedSkills.length / this.requirements.skills.length) * 100;
-      match.score += (skillMatchPercentage * 0.25); // 25% of total score
-      
-      if (skillMatchPercentage > 50) {
-        match.matchedCriteria.push('skills');
-      } else {
-        match.missingCriteria.push('skills');
-      }
-    }
-
-    // Experience match
-    if (this.requirements.experience) {
-      if (experience && experience >= this.parseExperience(this.requirements.experience)) {
-        match.score += 25;
-        match.matchedCriteria.push('experience');
-      } else {
-        match.missingCriteria.push('experience');
-      }
-    }
-
-    // GPA match (if transcripts available)
-    if (transcripts && transcripts.length > 0) {
-      const averageGPA = transcripts.reduce((sum, t) => sum + (t.gpa || 0), 0) / transcripts.length;
-      if (averageGPA >= 3.0) {
-        match.score += 25;
-        match.matchedCriteria.push('academic performance');
-      }
-    } else {
-      match.score += 15; // Base score if no transcripts
-    }
-
-    // Round score to 2 decimal places
-    match.score = Math.round(match.score * 100) / 100;
-
-    return match;
-  }
-
-  // Helper method to parse experience requirements
-  parseExperience(experienceString) {
-    const years = experienceString.match(/\d+/);
-    return years ? parseInt(years[0]) : 0;
   }
 
   // Convert to plain object
@@ -484,8 +446,16 @@ class Job {
       errors.push('Description must be at least 10 characters long');
     }
 
-    if (!jobData.requirements) {
-      errors.push('Requirements are required');
+    // Validate educational requirements
+    if (jobData.requirements) {
+      const validEducationLevels = ['high_school', 'associate', 'bachelor', 'master', 'phd'];
+      if (jobData.requirements.educationalLevel && !validEducationLevels.includes(jobData.requirements.educationalLevel)) {
+        errors.push('Valid educational level is required: high_school, associate, bachelor, master, phd');
+      }
+
+      if (jobData.requirements.minGPA && (jobData.requirements.minGPA < 0 || jobData.requirements.minGPA > 4.0)) {
+        errors.push('Minimum GPA must be between 0 and 4.0');
+      }
     }
 
     return errors;

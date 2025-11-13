@@ -1,6 +1,7 @@
 import { db } from '../config/firebase-admin.js';
 import { collections } from '../config/database.js';
 import { validateJob, validateJobApplication } from '../validators/jobValidators.js';
+import Job from '../models/Job.js';
 
 export const getJobs = async (req, res) => {
   try {
@@ -39,7 +40,6 @@ export const getJobs = async (req, res) => {
     }
 
     if (search) {
-      // Basic search implementation
       query = query.where('title', '>=', search).where('title', '<=', search + '\uf8ff');
     }
 
@@ -102,6 +102,72 @@ export const getJobs = async (req, res) => {
       success: false,
       error: 'JOBS_FETCH_FAILED',
       message: 'Failed to fetch jobs'
+    });
+  }
+};
+
+// NEW: Get jobs qualified for student
+export const getQualifiedJobs = async (req, res) => {
+  try {
+    const studentId = req.user.userId;
+    const { page = 1, limit = 10 } = req.query;
+
+    // Check if user is a student
+    if (req.user.role !== 'student') {
+      return res.status(403).json({
+        success: false,
+        error: 'FORBIDDEN',
+        message: 'Only students can view qualified jobs'
+      });
+    }
+
+    // Get student profile
+    const studentDoc = await db.collection(collections.STUDENTS).doc(studentId).get();
+    if (!studentDoc.exists()) {
+      return res.status(404).json({
+        success: false,
+        error: 'STUDENT_NOT_FOUND',
+        message: 'Student profile not found'
+      });
+    }
+
+    const studentProfile = studentDoc.data();
+
+    // Get qualified jobs using the model method
+    const result = await Job.findQualifiedForStudent(studentProfile, { page, limit });
+
+    // Add qualification breakdown to each job
+    const jobsWithBreakdown = result.jobs.map(job => {
+      const breakdown = job.getQualificationBreakdown(studentProfile);
+      
+      // Calculate match score based on met requirements
+      const totalRequirements = breakdown.length;
+      const metRequirements = breakdown.filter(req => req.meets).length;
+      const matchScore = totalRequirements > 0 ? Math.round((metRequirements / totalRequirements) * 100) : 0;
+
+      return {
+        ...job.toObject(),
+        qualificationBreakdown: breakdown,
+        matchScore
+      };
+    });
+
+    res.json({
+      success: true,
+      jobs: jobsWithBreakdown,
+      pagination: result.pagination,
+      studentQualifications: {
+        educationLevel: studentProfile.qualifications?.educationLevel,
+        gpa: studentProfile.qualifications?.gpa
+      }
+    });
+
+  } catch (error) {
+    console.error('Get qualified jobs error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'QUALIFIED_JOBS_FETCH_FAILED',
+      message: 'Failed to fetch qualified jobs'
     });
   }
 };
@@ -319,6 +385,7 @@ export const updateJob = async (req, res) => {
   }
 };
 
+// ADD THIS MISSING FUNCTION
 export const applyForJob = async (req, res) => {
   try {
     const studentId = req.user.userId;

@@ -1,81 +1,72 @@
-// Simplified course controller for development
+import { db } from '../config/firebase-admin.js';
+import { collections } from '../config/database.js';
+import Course from '../models/Course.js';
+
 export const getCourses = async (req, res) => {
   try {
+    const { 
+      institution, 
+      faculty, 
+      search,
+      page = 1, 
+      limit = 10 
+    } = req.query;
+
+    let query = db.collection(collections.COURSES);
+
+    // Apply filters
+    if (institution) {
+      query = query.where('institutionId', '==', institution);
+    }
+
+    if (faculty) {
+      query = query.where('faculty', '==', faculty);
+    }
+
+    if (search) {
+      query = query.where('name', '>=', search).where('name', '<=', search + '\uf8ff');
+    }
+
+    // Get total count
+    const countSnapshot = await query.get();
+    const total = countSnapshot.size;
+
+    // Apply pagination
+    const startAfter = (page - 1) * limit;
+    const snapshot = await query
+      .where('status', '==', 'active')
+      .orderBy('createdAt', 'desc')
+      .offset(startAfter)
+      .limit(parseInt(limit))
+      .get();
+
+    const courses = [];
+    snapshot.forEach(doc => {
+      const courseData = doc.data();
+      courses.push({
+        id: doc.id,
+        name: courseData.name,
+        institutionId: courseData.institutionId,
+        institutionName: courseData.institutionName,
+        faculty: courseData.faculty,
+        duration: courseData.duration,
+        description: courseData.description,
+        requirements: courseData.requirements,
+        fees: courseData.fees,
+        intake: courseData.intake,
+        applicationDeadline: courseData.applicationDeadline,
+        status: courseData.status
+      });
+    });
+
     res.json({
       success: true,
-      courses: [
-        {
-          id: 'cs-001',
-          name: 'Computer Science',
-          institutionId: 'nul-001',
-          institutionName: 'National University of Lesotho',
-          faculty: 'Information Technology',
-          level: 'bachelor',
-          duration: 4,
-          description: 'Bachelor of Science in Computer Science',
-          requirements: {
-            minGrade: 'C',
-            minPoints: 30,
-            subjects: ['Mathematics', 'English', 'Science'],
-            certificates: ['High School Diploma']
-          },
-          fees: {
-            local: 15000,
-            currency: 'LSL'
-          },
-          intake: ['January', 'September'],
-          status: 'active'
-        },
-        {
-          id: 'bit-001',
-          name: 'Business Information Technology',
-          institutionId: 'lim-001',
-          institutionName: 'Limkokwing University',
-          faculty: 'Business & IT',
-          level: 'bachelor',
-          duration: 3,
-          description: 'Bachelor in Business Information Technology',
-          requirements: {
-            minGrade: 'D',
-            minPoints: 25,
-            subjects: ['Mathematics', 'English'],
-            certificates: ['High School Diploma']
-          },
-          fees: {
-            local: 18000,
-            currency: 'LSL'
-          },
-          intake: ['January', 'May', 'September'],
-          status: 'active'
-        },
-        {
-          id: 'med-001',
-          name: 'Medicine',
-          institutionId: 'nul-001',
-          institutionName: 'National University of Lesotho',
-          faculty: 'Health Sciences',
-          level: 'bachelor',
-          duration: 6,
-          description: 'Bachelor of Medicine and Bachelor of Surgery',
-          requirements: {
-            minGrade: 'B',
-            minPoints: 40,
-            subjects: ['Biology', 'Chemistry', 'Physics', 'Mathematics'],
-            certificates: ['High School Diploma']
-          },
-          fees: {
-            local: 25000,
-            currency: 'LSL'
-          },
-          intake: ['January'],
-          status: 'active'
-        }
-      ],
+      courses,
       pagination: {
-        page: 1,
-        limit: 10,
-        total: 3,
-        pages: 1
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / limit)
       }
     });
   } catch (error) {
@@ -92,66 +83,130 @@ export const getCourseById = async (req, res) => {
   try {
     const { id } = req.params;
 
+    const courseDoc = await db.collection(collections.COURSES).doc(id).get();
+    
+    if (!courseDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        error: 'COURSE_NOT_FOUND',
+        message: 'Course not found'
+      });
+    }
+
+    const courseData = courseDoc.data();
+
+    // Get institution details
+    const institutionDoc = await db.collection(collections.INSTITUTIONS)
+      .doc(courseData.institutionId)
+      .get();
+    const institutionData = institutionDoc.data();
+
+    // Get similar courses from same institution and faculty
+    const similarCoursesSnapshot = await db.collection(collections.COURSES)
+      .where('institutionId', '==', courseData.institutionId)
+      .where('faculty', '==', courseData.faculty)
+      .where('status', '==', 'active')
+      .where('id', '!=', id)
+      .limit(4)
+      .get();
+
+    const similarCourses = [];
+    similarCoursesSnapshot.forEach(doc => {
+      const similarData = doc.data();
+      similarCourses.push({
+        id: doc.id,
+        name: similarData.name,
+        faculty: similarData.faculty,
+        duration: similarData.duration
+      });
+    });
+
     const course = {
-      id: id,
-      name: 'Computer Science',
-      institutionId: 'nul-001',
-      institutionName: 'National University of Lesotho',
-      faculty: 'Information Technology',
-      level: 'bachelor',
-      duration: 4,
-      description: 'Bachelor of Science in Computer Science focusing on software development, algorithms, and computer systems.',
-      requirements: {
-        minGrade: 'C',
-        minPoints: 30,
-        subjects: ['Mathematics', 'English', 'Science'],
-        certificates: ['High School Diploma']
-      },
-      fees: {
-        local: 15000,
-        international: 30000,
-        currency: 'LSL'
-      },
-      intakePeriods: ['January', 'September'],
-      applicationDeadline: new Date('2024-12-31'),
-      capacity: 100,
-      status: 'active',
+      id: courseDoc.id,
+      ...courseData,
       institution: {
-        id: 'nul-001',
-        name: 'National University of Lesotho',
-        type: 'university',
-        location: 'Roma',
-        contact: {
-          email: 'admissions@nul.ls',
-          phone: '+266 5221 4211'
-        }
+        id: institutionData.id,
+        name: institutionData.name,
+        type: institutionData.type,
+        location: institutionData.location,
+        contact: institutionData.contact
       },
-      similarCourses: [
-        {
-          id: 'it-001',
-          name: 'Information Technology',
-          faculty: 'Information Technology',
-          duration: 3
-        },
-        {
-          id: 'se-001',
-          name: 'Software Engineering',
-          faculty: 'Information Technology',
-          duration: 4
-        }
-      ]
+      similarCourses
     };
 
     res.json({
       success: true,
       course
     });
+
   } catch (error) {
     console.error('Get course error:', error);
     res.status(500).json({
       success: false,
       error: 'COURSE_FETCH_FAILED',
       message: 'Failed to fetch course details'
+    });
+  }
+};
+
+export const createCourse = async (req, res) => {
+  try {
+    const courseData = {
+      ...req.body,
+      id: 'course-' + Date.now(),
+      status: 'active',
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    res.status(201).json({
+      success: true,
+      message: 'Course created successfully',
+      course: courseData
+    });
+  } catch (error) {
+    console.error('Create course error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'COURSE_CREATION_FAILED',
+      message: 'Failed to create course'
+    });
+  }
+};
+
+export const updateCourse = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    res.json({
+      success: true,
+      message: 'Course updated successfully',
+      course: { id, ...req.body }
+    });
+  } catch (error) {
+    console.error('Update course error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'COURSE_UPDATE_FAILED',
+      message: 'Failed to update course'
+    });
+  }
+};
+
+export const deleteCourse = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    res.json({
+      success: true,
+      message: 'Course deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete course error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'COURSE_DELETION_FAILED',
+      message: 'Failed to delete course'
     });
   }
 };
@@ -305,110 +360,6 @@ export const checkCourseEligibility = async (req, res) => {
   }
 };
 
-export const createCourse = async (req, res) => {
-  try {
-    const courseData = {
-      ...req.body,
-      id: 'course-' + Date.now(),
-      status: 'active',
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
-    res.status(201).json({
-      success: true,
-      message: 'Course created successfully',
-      course: courseData
-    });
-  } catch (error) {
-    console.error('Create course error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'COURSE_CREATION_FAILED',
-      message: 'Failed to create course'
-    });
-  }
-};
-
-export const updateCourse = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    res.json({
-      success: true,
-      message: 'Course updated successfully',
-      course: { id, ...req.body }
-    });
-  } catch (error) {
-    console.error('Update course error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'COURSE_UPDATE_FAILED',
-      message: 'Failed to update course'
-    });
-  }
-};
-
-export const deleteCourse = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    res.json({
-      success: true,
-      message: 'Course deleted successfully'
-    });
-  } catch (error) {
-    console.error('Delete course error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'COURSE_DELETION_FAILED',
-      message: 'Failed to delete course'
-    });
-  }
-};
-
-export const getPopularCourses = async (req, res) => {
-  try {
-    res.json({
-      success: true,
-      popularCourses: [
-        {
-          id: 'cs-001',
-          name: 'Computer Science',
-          institutionName: 'National University of Lesotho',
-          faculty: 'Information Technology',
-          duration: 4,
-          applicationCount: 45
-        },
-        {
-          id: 'bit-001',
-          name: 'Business Information Technology',
-          institutionName: 'Limkokwing University',
-          faculty: 'Business & IT',
-          duration: 3,
-          applicationCount: 32
-        },
-        {
-          id: 'med-001',
-          name: 'Medicine',
-          institutionName: 'National University of Lesotho',
-          faculty: 'Health Sciences',
-          duration: 6,
-          applicationCount: 28
-        }
-      ]
-    });
-  } catch (error) {
-    console.error('Get popular courses error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'POPULAR_COURSES_FETCH_FAILED',
-      message: 'Failed to fetch popular courses'
-    });
-  }
-};
-
-// New endpoints for grade-based filtering
 export const getEligibleCourses = async (req, res) => {
   try {
     const { studentId } = req.params;
@@ -549,6 +500,47 @@ export const getRecommendedCourses = async (req, res) => {
       success: false,
       error: 'RECOMMENDED_COURSES_FETCH_FAILED',
       message: 'Failed to fetch recommended courses'
+    });
+  }
+};
+
+export const getPopularCourses = async (req, res) => {
+  try {
+    res.json({
+      success: true,
+      courses: [
+        {
+          id: 'cs-001',
+          name: 'Computer Science',
+          institutionName: 'National University of Lesotho',
+          faculty: 'Information Technology',
+          duration: 4,
+          applicationCount: 45
+        },
+        {
+          id: 'bit-001',
+          name: 'Business Information Technology',
+          institutionName: 'Limkokwing University',
+          faculty: 'Business & IT',
+          duration: 3,
+          applicationCount: 32
+        },
+        {
+          id: 'med-001',
+          name: 'Medicine',
+          institutionName: 'National University of Lesotho',
+          faculty: 'Health Sciences',
+          duration: 6,
+          applicationCount: 28
+        }
+      ]
+    });
+  } catch (error) {
+    console.error('Get popular courses error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'POPULAR_COURSES_FETCH_FAILED',
+      message: 'Failed to fetch popular courses'
     });
   }
 };

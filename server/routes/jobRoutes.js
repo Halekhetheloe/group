@@ -1,6 +1,7 @@
 import express from 'express';
 import {
   getJobs,
+  getQualifiedJobs, // ADD THIS IMPORT
   getJobById,
   createJob,
   updateJob,
@@ -18,7 +19,7 @@ import {
   checkJobAvailability
 } from '../middleware/roleMiddleware.js';
 import { validatePagination } from '../middleware/validationMiddleware.js';
-import { collections } from '../config/database.js'; // ADD THIS IMPORT
+import { collections } from '../config/database.js';
 
 const router = express.Router();
 
@@ -28,6 +29,9 @@ router.get('/:id', getJobById);
 
 // Protected routes
 router.use(authenticateToken);
+
+// Student routes - Qualified jobs
+router.get('/qualified/student', requireStudent, getQualifiedJobs); // ADD THIS ROUTE
 
 // Job application (Students only)
 router.post('/:id/apply', requireStudent, checkJobAvailability, applyForJob);

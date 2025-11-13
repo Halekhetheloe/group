@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react'
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore'
+import { doc, getDoc, setDoc } from 'firebase/firestore'
 import { db } from '../../firebase-config'
 import { useAuth } from '../../hooks/useAuth'
 import toast from 'react-hot-toast'
-import { Plus, X, Upload, GraduationCap, Award, BookOpen, Save, CheckCircle, FileText, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, X, GraduationCap, Award, BookOpen, Save, CheckCircle, FileText, ChevronDown, ChevronUp } from 'lucide-react'
 
 const StudentProfile = () => {
   const { userData } = useAuth()
@@ -13,57 +13,28 @@ const StudentProfile = () => {
   const [profile, setProfile] = useState({
     displayName: '',
     email: '',
-    phone: '',
-    address: '',
-    bio: '',
     education: {
       level: '',
       institution: '',
       major: '',
-      graduationYear: '',
       gpa: '',
-      degreeType: '',
-      // Course-specific grades
+      // Course qualifications
       subjects: {},
       overallGrade: '',
       points: 0
     },
-    certificates: [],
-    skills: [],
-    documents: {
-      transcript: false,
-      diploma: false,
-      certificate: false,
-      portfolio: false,
-      recommendation_letter: false,
-      cover_letter: false
-    },
     experience: '',
     profileCompleted: false
   })
-  const [currentCertificate, setCurrentCertificate] = useState('')
-  const [currentSkill, setCurrentSkill] = useState('')
   const [subjectInput, setSubjectInput] = useState({ name: '', grade: '' })
 
-  // Predefined options for better UX
+  // Education levels for job requirements
   const educationLevels = [
     { value: 'high_school', label: 'High School Diploma' },
     { value: 'associate', label: 'Associate Degree' },
     { value: 'bachelor', label: "Bachelor's Degree" },
     { value: 'master', label: "Master's Degree" },
     { value: 'phd', label: 'PhD' }
-  ]
-
-  const degreeTypes = [
-    'Computer Science',
-    'Engineering',
-    'Business Administration',
-    'Medicine',
-    'Law',
-    'Arts',
-    'Sciences',
-    'Education',
-    'Other'
   ]
 
   const experienceLevels = [
@@ -74,51 +45,87 @@ const StudentProfile = () => {
     { value: 'senior_level', label: 'Senior Level (5+ years)' }
   ]
 
-  const commonCertificates = [
-    'AWS Certified Solutions Architect',
-    'Google Cloud Certified',
-    'Microsoft Certified: Azure Fundamentals',
-    'PMP (Project Management Professional)',
-    'CompTIA A+',
-    'CompTIA Security+',
-    'Cisco CCNA',
-    'Certified Ethical Hacker (CEH)',
-    'Six Sigma Green Belt',
-    'Scrum Master Certified',
-    'IELTS Academic',
-    'TOEFL iBT',
-    'First Aid Certified',
-    'CPR Certified'
+  // Common subjects
+  const commonSubjects = [
+    'Mathematics', 'English Language', 'Science', 'Biology', 'Physics', 'Chemistry',
+    'Computer Science', 'Programming', 'Data Structures', 'Algorithms',
+    'Database Management', 'Web Development', 'Networking', 'Statistics'
   ]
 
-  const commonSkills = [
-    'JavaScript',
-    'Python',
-    'Java',
-    'React',
-    'Node.js',
-    'SQL',
-    'HTML/CSS',
-    'TypeScript',
-    'Git',
-    'Docker',
-    'AWS',
-    'Azure',
-    'Project Management',
-    'Communication',
-    'Problem Solving',
-    'Team Leadership',
-    'Data Analysis',
-    'Machine Learning',
-    'UI/UX Design',
-    'Agile Methodology'
+  // Grade options with points for course requirements
+  const gradeOptions = [
+    { value: 'A', label: 'A', points: 5 },
+    { value: 'B', label: 'B', points: 4 },
+    { value: 'C', label: 'C', points: 3 },
+    { value: 'D', label: 'D', points: 2 },
+    { value: 'E', label: 'E', points: 1 },
+    { value: 'F', label: 'F', points: 0 }
   ]
 
-  const gradeOptions = ['A', 'B', 'C', 'D', 'E', 'F']
+  // Calculate total points automatically
+  const calculateTotalPoints = (subjects) => {
+    return Object.values(subjects).reduce((total, grade) => {
+      const gradeInfo = gradeOptions.find(g => g.value === grade)
+      return total + (gradeInfo?.points || 0)
+    }, 0)
+  }
+
+  // NEW: Auto-calculate overall grade based on subjects
+  const calculateOverallGrade = (subjects) => {
+    if (!subjects || Object.keys(subjects).length === 0) return '';
+    
+    const gradePoints = { 'A': 5, 'B': 4, 'C': 3, 'D': 2, 'E': 1, 'F': 0 };
+    let totalPoints = 0;
+    let subjectCount = 0;
+    
+    Object.values(subjects).forEach(grade => {
+      if (grade && gradePoints[grade] !== undefined) {
+        totalPoints += gradePoints[grade];
+        subjectCount++;
+      }
+    });
+    
+    if (subjectCount === 0) return '';
+    
+    const averagePoints = totalPoints / subjectCount;
+    
+    // Convert back to letter grade
+    if (averagePoints >= 4.5) return 'A';
+    if (averagePoints >= 3.5) return 'B';
+    if (averagePoints >= 2.5) return 'C';
+    if (averagePoints >= 1.5) return 'D';
+    return 'E';
+  }
 
   useEffect(() => {
     fetchStudentProfile()
   }, [userData])
+
+  // Auto-update points when subjects change
+  useEffect(() => {
+    const totalPoints = calculateTotalPoints(profile.education.subjects)
+    setProfile(prev => ({
+      ...prev,
+      education: {
+        ...prev.education,
+        points: totalPoints
+      }
+    }))
+
+    // NEW: Auto-calculate overall grade when subjects change
+    if (Object.keys(profile.education.subjects).length > 0) {
+      const calculatedOverallGrade = calculateOverallGrade(profile.education.subjects)
+      if (calculatedOverallGrade && !profile.education.overallGrade) {
+        setProfile(prev => ({
+          ...prev,
+          education: {
+            ...prev.education,
+            overallGrade: calculatedOverallGrade
+          }
+        }))
+      }
+    }
+  }, [profile.education.subjects])
 
   const fetchStudentProfile = async () => {
     try {
@@ -133,16 +140,9 @@ const StudentProfile = () => {
           education: {
             ...prev.education,
             ...(studentData.education || {})
-          },
-          documents: {
-            ...prev.documents,
-            ...(studentData.documents || {})
-          },
-          certificates: studentData.certificates || [],
-          skills: studentData.skills || []
+          }
         }))
       } else {
-        // Initialize with user data
         setProfile(prev => ({
           ...prev,
           displayName: userData.displayName || '',
@@ -175,55 +175,7 @@ const StudentProfile = () => {
     }))
   }
 
-  const handleDocumentChange = (document, hasDocument) => {
-    setProfile(prev => ({
-      ...prev,
-      documents: {
-        ...prev.documents,
-        [document]: hasDocument
-      }
-    }))
-  }
-
-  // Certificate functions with dropdown
-  const addCertificate = (certificate = null) => {
-    const certToAdd = certificate || currentCertificate.trim()
-    if (certToAdd && !profile.certificates.includes(certToAdd)) {
-      setProfile(prev => ({
-        ...prev,
-        certificates: [...prev.certificates, certToAdd]
-      }))
-      setCurrentCertificate('')
-    }
-  }
-
-  const removeCertificate = (certificate) => {
-    setProfile(prev => ({
-      ...prev,
-      certificates: prev.certificates.filter(c => c !== certificate)
-    }))
-  }
-
-  // Skills functions with dropdown
-  const addSkill = (skill = null) => {
-    const skillToAdd = skill || currentSkill.trim()
-    if (skillToAdd && !profile.skills.includes(skillToAdd)) {
-      setProfile(prev => ({
-        ...prev,
-        skills: [...prev.skills, skillToAdd]
-      }))
-      setCurrentSkill('')
-    }
-  }
-
-  const removeSkill = (skill) => {
-    setProfile(prev => ({
-      ...prev,
-      skills: prev.skills.filter(s => s !== skill)
-    }))
-  }
-
-  // Subject/Grades functions
+  // Subject functions
   const addSubject = () => {
     if (subjectInput.name.trim() && subjectInput.grade) {
       setProfile(prev => ({
@@ -252,6 +204,11 @@ const StudentProfile = () => {
     }))
   }
 
+  const getGradePoints = (grade) => {
+    const gradeInfo = gradeOptions.find(g => g.value === grade)
+    return gradeInfo?.points || 0
+  }
+
   const calculateProfileCompletion = () => {
     let completed = 0
     let total = 0
@@ -261,23 +218,16 @@ const StudentProfile = () => {
     if (profile.email) completed++
     total += 2
 
-    // Education
-    const education = profile.education
-    if (education.level) completed++
-    if (education.institution) completed++
-    if (education.major) completed++
-    if (education.gpa) completed++
-    if (education.overallGrade) completed++
-    total += 5
+    // Education (job requirements)
+    if (profile.education.level) completed++
+    if (profile.education.institution) completed++
+    if (profile.education.gpa) completed++
+    total += 3
 
-    // Skills & certificates
-    if (profile.skills.length > 0) completed++
-    if (profile.certificates.length > 0) completed++
+    // Course requirements
+    if (Object.keys(profile.education.subjects).length > 0) completed++
+    if (profile.education.overallGrade) completed++ // NEW: Count overall grade
     total += 2
-
-    // Experience
-    if (profile.experience) completed++
-    total += 1
 
     return Math.round((completed / total) * 100)
   }
@@ -294,19 +244,16 @@ const StudentProfile = () => {
         ...profile,
         updatedAt: new Date(),
         profileCompleted: calculateProfileCompletion() >= 70,
+        // Job qualifications
         qualifications: {
           gpa: profile.education.gpa ? parseFloat(profile.education.gpa) : null,
           educationLevel: profile.education.level,
-          degreeType: profile.education.major,
-          certificates: profile.certificates,
-          skills: profile.skills,
           experience: profile.experience,
-          documents: profile.documents,
           // Course qualifications
           grades: {
             overall: profile.education.overallGrade,
             subjects: profile.education.subjects,
-            points: profile.education.points || 0
+            points: profile.education.points
           }
         }
       }
@@ -349,7 +296,7 @@ const StudentProfile = () => {
             <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
               <div className="lg:col-span-1 space-y-4">
-                {[...Array(5)].map((_, i) => (
+                {[...Array(3)].map((_, i) => (
                   <div key={i} className="h-16 bg-gray-200 rounded"></div>
                 ))}
               </div>
@@ -394,7 +341,6 @@ const StudentProfile = () => {
           </div>
         </div>
 
-        {/* Profile Completion Alert */}
         {completionPercentage < 70 && (
           <div className="bg-gradient-to-r from-yellow-400 to-orange-400 text-white rounded-xl p-4 mb-6 shadow-lg">
             <div className="flex items-center">
@@ -409,7 +355,6 @@ const StudentProfile = () => {
                 </h3>
                 <p className="text-sm opacity-90 mt-1">
                   Finish setting up your profile to see courses and jobs that match your qualifications. 
-                  You need at least 70% completion.
                 </p>
               </div>
             </div>
@@ -426,28 +371,16 @@ const StudentProfile = () => {
               isActive={activeSection === 'basic'}
             />
             <SectionButton
-              id="education"
-              title="Education & Grades"
-              icon={GraduationCap}
-              isActive={activeSection === 'education'}
-            />
-            <SectionButton
-              id="certificates"
-              title="Certificates"
+              id="jobRequirements"
+              title="Job Requirements"
               icon={Award}
-              isActive={activeSection === 'certificates'}
+              isActive={activeSection === 'jobRequirements'}
             />
             <SectionButton
-              id="skills"
-              title="Skills"
+              id="courseRequirements"
+              title="Course Requirements"
               icon={BookOpen}
-              isActive={activeSection === 'skills'}
-            />
-            <SectionButton
-              id="documents"
-              title="Documents"
-              icon={CheckCircle}
-              isActive={activeSection === 'documents'}
+              isActive={activeSection === 'courseRequirements'}
             />
           </div>
 
@@ -489,20 +422,6 @@ const StudentProfile = () => {
 
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Phone Number
-                      </label>
-                      <input
-                        type="tel"
-                        name="phone"
-                        value={profile.phone}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                        placeholder="+266 1234 5678"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
                         Experience Level
                       </label>
                       <select
@@ -519,28 +438,18 @@ const StudentProfile = () => {
                         ))}
                       </select>
                     </div>
-
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Bio
-                      </label>
-                      <textarea
-                        name="bio"
-                        value={profile.bio}
-                        onChange={handleInputChange}
-                        rows={4}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                        placeholder="Tell us about yourself, your career goals, and what you're looking for..."
-                      />
-                    </div>
                   </div>
                 </div>
               )}
 
-              {/* Education & Grades */}
-              {activeSection === 'education' && (
+              {/* Job Requirements */}
+              {activeSection === 'jobRequirements' && (
                 <div className="space-y-6">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-6">Education & Grades</h2>
+                  <h2 className="text-2xl font-bold text-gray-900 mb-6">Job Requirements</h2>
+                  <p className="text-gray-600 mb-6">
+                    Set your educational qualifications for job applications
+                  </p>
+                  
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -575,40 +484,20 @@ const StudentProfile = () => {
 
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Major/Field of Study *
+                        Major/Field of Study
                       </label>
-                      <select
+                      <input
+                        type="text"
                         value={profile.education.major}
                         onChange={(e) => handleEducationChange('major', e.target.value)}
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                      >
-                        <option value="">Select your major</option>
-                        {degreeTypes.map(degree => (
-                          <option key={degree} value={degree}>
-                            {degree}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Graduation Year
-                      </label>
-                      <input
-                        type="number"
-                        value={profile.education.graduationYear}
-                        onChange={(e) => handleEducationChange('graduationYear', e.target.value)}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                        placeholder="e.g., 2024"
-                        min="1900"
-                        max="2030"
+                        placeholder="e.g., Computer Science"
                       />
                     </div>
 
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        GPA (4.0 scale)
+                        GPA (4.0 scale) *
                       </label>
                       <input
                         type="number"
@@ -621,77 +510,157 @@ const StudentProfile = () => {
                         placeholder="e.g., 3.5"
                       />
                     </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Overall Grade
-                      </label>
-                      <select
-                        value={profile.education.overallGrade}
-                        onChange={(e) => handleEducationChange('overallGrade', e.target.value)}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                      >
-                        <option value="">Select overall grade</option>
-                        {gradeOptions.map(grade => (
-                          <option key={grade} value={grade}>
-                            Grade {grade}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
                   </div>
+                </div>
+              )}
 
-                  {/* Subject Grades */}
-                  <div className="mt-8">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Subject Grades</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              {/* Course Requirements */}
+              {activeSection === 'courseRequirements' && (
+                <div className="space-y-6">
+                  <h2 className="text-2xl font-bold text-gray-900 mb-6">Course Requirements</h2>
+                  <p className="text-gray-600 mb-6">
+                    Add your subject grades - points are automatically calculated
+                  </p>
+
+                  {/* NEW: Overall Grade Selection */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
+                    <h3 className="text-lg font-semibold text-blue-900 mb-4">Overall Grade</h3>
+                    <p className="text-blue-700 mb-4">
+                      Set your overall grade. This is required for course eligibility.
+                      {Object.keys(profile.education.subjects).length > 0 && !profile.education.overallGrade && (
+                        <span className="font-medium"> We suggest: {calculateOverallGrade(profile.education.subjects)}</span>
+                      )}
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Subject Name</label>
-                        <input
-                          type="text"
-                          value={subjectInput.name}
-                          onChange={(e) => setSubjectInput(prev => ({ ...prev, name: e.target.value }))}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                          placeholder="e.g., Mathematics"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Grade</label>
+                        <label className="block text-sm font-semibold text-blue-800 mb-2">
+                          Overall Grade *
+                        </label>
                         <select
-                          value={subjectInput.grade}
-                          onChange={(e) => setSubjectInput(prev => ({ ...prev, grade: e.target.value }))}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                          value={profile.education.overallGrade}
+                          onChange={(e) => handleEducationChange('overallGrade', e.target.value)}
+                          className="w-full px-4 py-3 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white"
                         >
-                          <option value="">Select grade</option>
+                          <option value="">Select your overall grade</option>
                           {gradeOptions.map(grade => (
-                            <option key={grade} value={grade}>
-                              {grade}
+                            <option key={grade.value} value={grade.value}>
+                              {grade.label}
                             </option>
                           ))}
                         </select>
                       </div>
                       <div className="flex items-end">
                         <button
-                          onClick={addSubject}
-                          className="w-full bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition-colors duration-200"
+                          onClick={() => {
+                            const suggestedGrade = calculateOverallGrade(profile.education.subjects)
+                            if (suggestedGrade) {
+                              handleEducationChange('overallGrade', suggestedGrade)
+                              toast.success(`Overall grade set to ${suggestedGrade}`)
+                            }
+                          }}
+                          disabled={Object.keys(profile.education.subjects).length === 0}
+                          className="w-full bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white px-4 py-3 rounded-lg transition-colors duration-200 font-medium"
                         >
-                          Add Subject
+                          Use Suggested Grade
                         </button>
                       </div>
                     </div>
+                    {!profile.education.overallGrade && (
+                      <p className="text-red-600 text-sm mt-3 font-medium">
+                        ⚠️ Overall grade is required for course eligibility
+                      </p>
+                    )}
+                  </div>
 
-                    {/* Display Subjects */}
-                    {Object.keys(profile.education.subjects).length > 0 && (
-                      <div className="bg-gray-50 rounded-lg p-4">
-                        <h4 className="font-medium text-gray-900 mb-3">Your Subjects</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          {Object.entries(profile.education.subjects).map(([subject, grade]) => (
+                  {/* Points Display */}
+                  {profile.education.points > 0 && (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="font-semibold text-green-800">Total Points: {profile.education.points}</h3>
+                          <p className="text-sm text-green-600 mt-1">
+                            Based on {Object.keys(profile.education.subjects).length} subject(s)
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm text-green-600">
+                            A=5, B=4, C=3, D=2, E=1, F=0
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Add Subject Form */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Subject</label>
+                      <select
+                        value={subjectInput.name}
+                        onChange={(e) => setSubjectInput(prev => ({ ...prev, name: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Select subject</option>
+                        {commonSubjects.map(subject => (
+                          <option 
+                            key={subject} 
+                            value={subject}
+                            disabled={Object.keys(profile.education.subjects).includes(subject)}
+                          >
+                            {subject} {Object.keys(profile.education.subjects).includes(subject) ? '✓' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Grade</label>
+                      <select
+                        value={subjectInput.grade}
+                        onChange={(e) => setSubjectInput(prev => ({ ...prev, grade: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Select grade</option>
+                        {gradeOptions.map(grade => (
+                          <option key={grade.value} value={grade.value}>
+                            {grade.label} ({grade.points} points)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex items-end">
+                      <button
+                        onClick={addSubject}
+                        disabled={!subjectInput.name || !subjectInput.grade}
+                        className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg transition-colors duration-200"
+                      >
+                        Add Subject
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Subjects List */}
+                  {Object.keys(profile.education.subjects).length > 0 ? (
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <h3 className="font-semibold text-gray-900 mb-3">Your Subjects</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {Object.entries(profile.education.subjects).map(([subject, grade]) => {
+                          const points = getGradePoints(grade)
+                          return (
                             <div key={subject} className="flex items-center justify-between bg-white px-4 py-3 rounded-lg border">
                               <div>
                                 <span className="font-medium text-gray-900">{subject}</span>
-                                <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 text-sm rounded-full">
-                                  Grade: {grade}
-                                </span>
+                                <div className="flex items-center space-x-2 mt-1">
+                                  <span className={`text-sm px-2 py-1 rounded-full ${
+                                    points >= 4 ? 'bg-green-100 text-green-800' :
+                                    points >= 3 ? 'bg-yellow-100 text-yellow-800' :
+                                    'bg-red-100 text-red-800'
+                                  }`}>
+                                    Grade: {grade}
+                                  </span>
+                                  <span className="text-sm text-blue-600 font-medium">
+                                    {points} points
+                                  </span>
+                                </div>
                               </div>
                               <button
                                 onClick={() => removeSubject(subject)}
@@ -700,223 +669,19 @@ const StudentProfile = () => {
                                 <X className="h-4 w-4" />
                               </button>
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Certificates */}
-              {activeSection === 'certificates' && (
-                <div className="space-y-6">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-6">Certificates & Licenses</h2>
-                  
-                  {/* Certificate Input */}
-                  <div className="mb-6">
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Add Certificate
-                    </label>
-                    <div className="flex gap-3 mb-4">
-                      <input
-                        type="text"
-                        value={currentCertificate}
-                        onChange={(e) => setCurrentCertificate(e.target.value)}
-                        className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                        placeholder="Type or select a certificate..."
-                        list="certificateOptions"
-                      />
-                      <datalist id="certificateOptions">
-                        {commonCertificates.map(cert => (
-                          <option key={cert} value={cert} />
-                        ))}
-                      </datalist>
-                      <button
-                        onClick={() => addCertificate()}
-                        className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg transition-colors duration-200 flex items-center"
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add
-                      </button>
-                    </div>
-
-                    {/* Quick Add Buttons */}
-                    <div className="mb-4">
-                      <p className="text-sm text-gray-600 mb-2">Quick add common certificates:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {commonCertificates.slice(0, 6).map(cert => (
-                          <button
-                            key={cert}
-                            onClick={() => addCertificate(cert)}
-                            className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm transition-colors duration-200"
-                          >
-                            + {cert.split(' ')[0]}
-                          </button>
-                        ))}
+                          )
+                        })}
                       </div>
                     </div>
-                  </div>
-
-                  {/* Certificate List */}
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Your Certificates</h3>
-                    {profile.certificates.length > 0 ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {profile.certificates.map((certificate, index) => (
-                          <div
-                            key={index}
-                            className="flex items-center justify-between bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 rounded-lg border border-blue-200"
-                          >
-                            <div className="flex items-center">
-                              <Award className="h-5 w-5 text-blue-500 mr-3" />
-                              <span className="font-medium text-gray-900">{certificate}</span>
-                            </div>
-                            <button
-                              onClick={() => removeCertificate(certificate)}
-                              className="text-red-500 hover:text-red-700 transition-colors"
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-8 bg-gray-50 rounded-lg">
-                        <Award className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                        <p className="text-gray-500">No certificates added yet</p>
-                        <p className="text-sm text-gray-400 mt-1">Add certificates to enhance your profile</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Skills */}
-              {activeSection === 'skills' && (
-                <div className="space-y-6">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-6">Skills</h2>
-                  
-                  {/* Skill Input */}
-                  <div className="mb-6">
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Add Skill
-                    </label>
-                    <div className="flex gap-3 mb-4">
-                      <input
-                        type="text"
-                        value={currentSkill}
-                        onChange={(e) => setCurrentSkill(e.target.value)}
-                        className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                        placeholder="Type or select a skill..."
-                        list="skillOptions"
-                      />
-                      <datalist id="skillOptions">
-                        {commonSkills.map(skill => (
-                          <option key={skill} value={skill} />
-                        ))}
-                      </datalist>
-                      <button
-                        onClick={() => addSkill()}
-                        className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg transition-colors duration-200 flex items-center"
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add
-                      </button>
+                  ) : (
+                    <div className="text-center py-8 bg-gray-50 rounded-lg">
+                      <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                      <p className="text-gray-500">No subjects added yet</p>
+                      <p className="text-sm text-gray-400 mt-1">
+                        Add subjects and grades to calculate your points
+                      </p>
                     </div>
-
-                    {/* Quick Add Buttons */}
-                    <div className="mb-4">
-                      <p className="text-sm text-gray-600 mb-2">Quick add common skills:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {commonSkills.slice(0, 8).map(skill => (
-                          <button
-                            key={skill}
-                            onClick={() => addSkill(skill)}
-                            className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm transition-colors duration-200"
-                          >
-                            + {skill}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Skill List */}
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Your Skills</h3>
-                    {profile.skills.length > 0 ? (
-                      <div className="flex flex-wrap gap-3">
-                        {profile.skills.map((skill, index) => (
-                          <div
-                            key={index}
-                            className="flex items-center bg-gradient-to-r from-green-50 to-emerald-50 px-4 py-2 rounded-full border border-green-200"
-                          >
-                            <span className="font-medium text-gray-900 mr-2">{skill}</span>
-                            <button
-                              onClick={() => removeSkill(skill)}
-                              className="text-red-500 hover:text-red-700 transition-colors"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-8 bg-gray-50 rounded-lg">
-                        <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                        <p className="text-gray-500">No skills added yet</p>
-                        <p className="text-sm text-gray-400 mt-1">Add skills to show what you can do</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Documents */}
-              {activeSection === 'documents' && (
-                <div className="space-y-6">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-6">Available Documents</h2>
-                  <p className="text-gray-600 mb-6">
-                    Select which documents you have available for course and job applications
-                  </p>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {Object.entries(profile.documents).map(([doc, hasDoc]) => (
-                      <label 
-                        key={doc} 
-                        className={`flex items-center space-x-4 p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 ${
-                          hasDoc 
-                            ? 'bg-green-50 border-green-200 shadow-sm' 
-                            : 'bg-white border-gray-200 hover:bg-gray-50'
-                        }`}
-                      >
-                        <div className={`flex-shrink-0 w-6 h-6 rounded border-2 flex items-center justify-center transition-all duration-200 ${
-                          hasDoc 
-                            ? 'bg-green-500 border-green-500' 
-                            : 'bg-white border-gray-300'
-                        }`}>
-                          {hasDoc && <CheckCircle className="h-4 w-4 text-white" />}
-                        </div>
-                        <input
-                          type="checkbox"
-                          checked={hasDoc}
-                          onChange={(e) => handleDocumentChange(doc, e.target.checked)}
-                          className="hidden"
-                        />
-                        <div className="flex-1">
-                          <span className={`font-medium capitalize ${
-                            hasDoc ? 'text-green-800' : 'text-gray-700'
-                          }`}>
-                            {doc.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                          </span>
-                          {hasDoc && (
-                            <p className="text-sm text-green-600 mt-1">✓ Available for applications</p>
-                          )}
-                        </div>
-                      </label>
-                    ))}
-                  </div>
+                  )}
                 </div>
               )}
 
